@@ -1,5 +1,5 @@
 import './App.css'
-import NQueensVisualizer from "./components/Nqueen.tsx";
+import NQueensVisualizer from "./components/nqueen";
 
 function App() {
   return (

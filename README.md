@@ -1,77 +1,68 @@
 # N-Queens Visualizer
 
-An interactive step-by-step visualizer for the N-Queens problem, built with React and TypeScript. Watch backtracking algorithms solve the board in real time, compare their efficiency, and explore every decision the algorithm makes.
-
-## Features
-
-- **Two algorithms** — classic Backtracking and Forward Checking, selectable in single mode
-- **Compare mode** — run both algorithms side-by-side as a live race, with a real-time efficiency comparison panel showing steps saved, conflicts pruned, and backtracks avoided
-- **Step-by-step playback** — play, pause, step forward/back, or scrub through the full trace with a slider
-- **Decision log** — a live feed of every algorithm event (enter, check, place, conflict, backtrack, solution), with the current event highlighted
-- **Call stack view** — visualizes the recursive call stack depth at each step
-- **Decision tree view** — shows the search space explored so far (available for N ≤ 6)
-- **Solutions gallery** — browse all unique solutions for the chosen N, with miniboard previews and a jump-to button
-- **Stats bar** — tracks placements, conflicts, and backtracks in real time, color-coded per metric
-- **Dark mode** — full light/dark support via CSS custom properties
-
-## Algorithms
-
-### Backtracking
-Places queens row by row, trying each column left to right. When a direct conflict is found (same column or diagonal as an already-placed queen), it moves to the next column. When all columns in a row fail, it backtracks to the previous row.
-
-### Forward Checking
-An optimized variant that, after placing each queen, propagates constraints forward: it removes the newly attacked squares from every future row's domain. If any future row's domain becomes empty, the branch is pruned immediately — before wasting time descending into it. This significantly reduces the number of nodes explored, especially for larger N.
+An interactive step-by-step visualizer for three N-Queens solving algorithms, built with React 19 + TypeScript + Vite.
 
 ## Getting Started
 
 **Prerequisites:** Node.js 18+
 
 ```bash
-# Install dependencies
 npm install
-
-# Start the dev server
-npm run dev
+npm run dev       # start dev server at http://localhost:5173
+npm run build     # type-check + production build
+npm run lint      # ESLint
+npm run preview   # preview production build locally
 ```
 
-Then open `http://localhost:5173` in your browser.
+## Modes
 
-```bash
-# Type-check
-npx tsc --noEmit
+| Mode | Description |
+|------|-------------|
+| **Single** | Step through one algorithm at your own pace with playback controls and a scrubber |
+| **Compare** | Race any two of the three algorithms side-by-side at the same step cadence |
+| **Charts** | 2×4 bar chart grid + data table comparing all three algorithms across N = 4–8, including runtime in µs |
+| **About** | Plain-English explanation of each algorithm with expandable comparison summaries |
+| **FAQ** | Accordion Q&A covering the problem, algorithms, metrics, and visualizer features |
 
-# Build for production
-npm run build
+## Algorithms
 
-# Preview the production build locally
-npm run preview
+| Key | Name | Highlight |
+|-----|------|-----------|
+| `bt` | Backtracking | Simplest; checks every cell and backtracks on conflict |
+| `fc` | Forward Checking (Pruning) | Maintains per-row domains; prunes when a future row empties |
+| `bm` | Bitmask | Uses integer bitmasks for O(1) conflict detection; never visits invalid cells |
+
+## Source layout
+
+```
+src/
+  App.tsx                     — root; mounts NQueensVisualizer
+  index.css                   — global CSS custom properties (light + dark)
+  main.tsx                    — React entry point
+  lib/
+    types.ts                  — shared TypeScript types
+    constants.ts              — CELL colours, TYPE_META, SPEED_MS, METHOD_META
+    algorithms.ts             — buildSteps, buildStepsFC, buildStepsBM, helpers
+  components/
+    nqueen/
+      Board.tsx               — Board + MiniBoard components
+      SolutionsGallery.tsx    — modal grid of all solutions
+      DecisionPanels.tsx      — CallStack, DecisionLog, DecisionTree tabs
+      StatsBar.tsx            — live counters (steps, placements, conflicts, backtracks)
+      CompareView.tsx         — MethodSide, ComparisonBar, CompareView
+      Charts.tsx              — BarChart, ChartsView, runtime measurement
+      About.tsx               — expandable algorithm explanation cards
+      FAQ.tsx                 — accordion Q&A
+      index.tsx               — NQueensVisualizer main component (default export)
 ```
 
 ## Deployment
 
-The project deploys automatically to GitHub Pages on every push to `main` via GitHub Actions.
+Deploys automatically to GitHub Pages on every push to `main` via GitHub Actions (`.github/workflows/deploy.yml`).
 
-**One-time setup:**
-1. Go to your repository → Settings → Pages
-2. Set Source to **GitHub Actions**
+**One-time setup:** Repository → Settings → Pages → Source: **GitHub Actions**
 
-The live site will be available at `https://<your-username>.github.io/nqueen/` after the first successful workflow run.
-
-If your repository is named something other than `nqueen`, update the `base` field in `vite.config.ts` to match.
-
-## Project Structure
-
-```
-src/
-  components/
-    Nqueen.tsx     # All visualizer logic and UI (single file)
-  App.tsx
-  index.css        # CSS custom properties (semantic color tokens, dark mode)
-  App.css
-.github/
-  workflows/
-    deploy.yml     # GitHub Pages deployment workflow
-```
+The live site is available at `https://<your-username>.github.io/nqueen/`. If the repository name differs, update the `base` field in `vite.config.ts`.
 
 ## Built With
 
