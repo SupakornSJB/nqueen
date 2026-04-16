@@ -18,6 +18,7 @@ npm run preview   # preview production build locally
 
 | Mode | Description |
 |------|-------------|
+| **Home** | Landing page — what N-Queens is, a solved example board, and an overview of all modes (default on first load) |
 | **Single** | Step through one algorithm at your own pace with playback controls and a scrubber |
 | **Compare** | Race any two of the three algorithms side-by-side at the same step cadence |
 | **Charts** | 2×4 bar chart grid + data table comparing all three algorithms across N = 4–8, including runtime in µs |
@@ -53,6 +54,7 @@ src/
       Charts.tsx              — BarChart, ChartsView, runtime measurement
       About.tsx               — expandable algorithm explanation cards
       FAQ.tsx                 — accordion Q&A
+      Intro.tsx               — home / landing page
       index.tsx               — NQueensVisualizer main component (default export)
 ```
 

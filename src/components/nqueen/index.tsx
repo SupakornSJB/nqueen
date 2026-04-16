@@ -11,10 +11,12 @@ import { CompareView } from "./CompareView";
 import { ChartsView } from "./Charts";
 import { AboutView } from "./About";
 import { FaqView } from "./FAQ";
+import { IntroView } from "./Intro";
 
-type AppMode = "single" | "compare" | "charts" | "about" | "faq";
+type AppMode = "home" | "single" | "compare" | "charts" | "about" | "faq";
 
 const MODES: { key: AppMode; label: string }[] = [
+    { key: "home",    label: "Home" },
     { key: "single",  label: "Single" },
     { key: "compare", label: "Compare" },
     { key: "charts",  label: "Charts" },
@@ -29,7 +31,7 @@ export default function NQueensVisualizer() {
     const [speed, setSpeed] = useState<SpeedKey>("medium");
     const [activeTab, setActiveTab] = useState<TabKey>("log");
     const [showGallery, setShowGallery] = useState<boolean>(false);
-    const [mode, setMode] = useState<AppMode>("single");
+    const [mode, setMode] = useState<AppMode>("home");
     const [method, setMethod] = useState<MethodKey>("bt");
     const [prevNMethod, setPrevNMethod] = useState({ n, method });
     const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -106,7 +108,7 @@ export default function NQueensVisualizer() {
         color: "var(--color-text-primary)",
     };
 
-    const hideControls = mode === "charts" || mode === "about" || mode === "faq";
+    const hideControls = mode === "home" || mode === "charts" || mode === "about" || mode === "faq";
 
     return (
         <div style={{ fontFamily: "var(--font-sans)", padding: "0.5rem 0", display: "flex", flexDirection: "column", gap: 10 }}>
@@ -245,6 +247,10 @@ export default function NQueensVisualizer() {
                     </>}
                 </div>
             )}
+
+            {/* ── Compare mode ─────────────────────────────────────────────── */}
+            {/* ── Home / intro mode ────────────────────────────────────────── */}
+            {mode === "home" && <IntroView onStart={() => setMode("single")} />}
 
             {/* ── Compare mode ─────────────────────────────────────────────── */}
             {mode === "compare" && <CompareView n={n} speed={speed} />}

@@ -77,6 +77,10 @@ const SECTIONS: FaqSection[] = [
                 q: "Why does the total step count grow so fast with N?",
                 a: "The N-Queens search space is O(N!) in the worst case. Even with pruning, the number of recursive calls grows super-exponentially. Each increment in N roughly multiplies the step count by 5–10×, which is why N=8 has thousands of times more steps than N=4.",
             },
+            {
+                q: "Why is Forward Checking sometimes slower in wall-clock time than Backtracking, even though it has fewer steps?",
+                a: "Step count measures the number of algorithm events, not the cost of each event. Forward Checking visits fewer nodes, but each node does more work: before recursing it copies the valid-column sets ('domains') for all N future rows. That copy operation is O(N²) per placement. At small N (4–5), the per-node overhead from these copies exceeds the savings from visiting fewer nodes, so FC wall-clock time can be higher than BT despite a lower step count. At N=7–8, the branch pruning is so aggressive that total work finally drops below BT. Bitmask avoids both the O(row) conflict scan of BT and the domain copying of FC, which is why it is fastest at every N.",
+            },
         ],
     },
     {
