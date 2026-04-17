@@ -35,10 +35,10 @@ function HeroBoard() {
 }
 
 const MODE_OVERVIEW: { key: string; label: string; emoji: string; desc: string }[] = [
+    { key: "about",   label: "Algorithms", emoji: "≡",  desc: "Plain-English explanations of each algorithm with time complexity charts — expand any card to explore." },
     { key: "single",  label: "Single",  emoji: "▶",  desc: "Step through one algorithm frame by frame. Use the scrubber, playback buttons, and decision log to trace every move." },
     { key: "compare", label: "Compare", emoji: "⇆",  desc: "Race any two algorithms side-by-side at the same step pace. See which finishes first and why." },
     { key: "charts",  label: "Charts",  emoji: "▦",  desc: "Bar charts of steps, runtime (µs), efficiency, and conflict rate for all three algorithms across N = 4–8." },
-    { key: "about",   label: "Algorithms", emoji: "≡",  desc: "Plain-English explanations of each algorithm with time complexity charts — expand any card to explore." },
     { key: "faq",     label: "FAQ",     emoji: "?",  desc: "Answers to common questions about the problem, the algorithms, and how to read the metrics." },
 ];
 

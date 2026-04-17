@@ -39,7 +39,7 @@ const DESCRIPTIONS: Record<MethodKey, AlgoDesc> = {
 
 // Per-method N ranges.  BM is pure bit-ops so it stays fast at higher N.
 const NS_FOR_METHOD: Record<MethodKey, number[]> = {
-    bt: [4, 5, 6, 7, 8, 9, 10, 11, 12],
+    bt: [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14],
     fc: [4, 5, 6, 7, 8, 9, 10, 11, 12, 13],
     bm: [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
 };
