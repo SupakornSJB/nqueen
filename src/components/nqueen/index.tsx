@@ -197,7 +197,7 @@ export default function NQueensVisualizer() {
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                         <span style={{ fontSize: 12, color: "var(--color-text-secondary)", marginRight: 6 }}>Algorithm</span>
-                        {(["bt", "fc", "bm"] as MethodKey[]).map(m => {
+                        {(["bt", "ht", "fc", "bm"] as MethodKey[]).map(m => {
                             const meta = METHOD_META[m];
                             const isActive = method === m;
                             return (
@@ -227,8 +227,8 @@ export default function NQueensVisualizer() {
                         }}>
                             {playing ? "⏸ Pause" : currentIdx >= steps.length - 1 ? "↺ Replay" : "▶ Play"}
                         </button>
-                        <button onClick={() => setCurrentIdx(i => Math.max(0, i - 1))} disabled={currentIdx === 0} style={btnBase}>◀ Back</button>
-                        <button onClick={advance} disabled={currentIdx >= steps.length - 1} style={btnBase}>Step ▶</button>
+                        <button onClick={() => { setPlaying(false); setCurrentIdx(i => Math.max(0, i - 1)); }} disabled={currentIdx === 0} style={btnBase}>◀ Back</button>
+                        <button onClick={() => { setPlaying(false); advance(); }} disabled={currentIdx >= steps.length - 1} style={btnBase}>Step ▶</button>
                         <button onClick={reset} style={btnBase}>↺ Reset</button>
                     </div>
                     <div>
@@ -323,7 +323,12 @@ export default function NQueensVisualizer() {
                                         <>{sectionLabel(`Stack depth: ${step ? step.stackDepth + 1 : 0}`)}<CallStack step={step} n={n} /></>
                                     )}
                                     {activeTab === "tree" && (
-                                        <>{sectionLabel("Search space explored so far")}<DecisionTree steps={steps} currentIdx={currentIdx} n={n} /></>
+                                        <>
+                                            <div style={{ fontSize: 10, fontWeight: 500, color: "var(--color-text-secondary)", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 2 }}>
+                                                Search space explored so far
+                                            </div>
+                                            <DecisionTree steps={steps} currentIdx={currentIdx} n={n} />
+                                        </>
                                     )}
                                     {activeTab === "depth" && (
                                         <>{sectionLabel("Recursion depth at each step")}<RecursionDepthChart steps={steps} currentIdx={currentIdx} /></>

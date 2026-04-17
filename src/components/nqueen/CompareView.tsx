@@ -308,10 +308,12 @@ export function CompareView({ n, speed }: { n: number; speed: SpeedKey }) {
         setPlaying(p => !p);
     };
     const stepBoth = () => {
+        setPlaying(false);
         setIdxA(i => Math.min(i + 1, stepsA.length - 1));
         setIdxB(i => Math.min(i + 1, stepsB.length - 1));
     };
     const backBoth = () => {
+        setPlaying(false);
         setIdxA(i => Math.max(i - 1, 0));
         setIdxB(i => Math.max(i - 1, 0));
     };
@@ -354,12 +356,12 @@ export function CompareView({ n, speed }: { n: number; speed: SpeedKey }) {
                 <div style={{ display: "flex", gap: 14, flexWrap: "wrap", alignItems: "center" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                         <span style={{ fontSize: 11, color: "var(--color-text-secondary)", minWidth: 28 }}>Left</span>
-                        {(["bt", "fc", "bm"] as MethodKey[]).map(m => methodBtn(m, methodA === m, () => selectA(m)))}
+                        {(["bt", "ht", "fc", "bm"] as MethodKey[]).map(m => methodBtn(m, methodA === m, () => selectA(m)))}
                     </div>
                     <span style={{ fontSize: 12, color: "var(--color-text-tertiary)" }}>vs</span>
                     <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                         <span style={{ fontSize: 11, color: "var(--color-text-secondary)", minWidth: 34 }}>Right</span>
-                        {(["bt", "fc", "bm"] as MethodKey[]).map(m => methodBtn(m, methodB === m, () => selectB(m)))}
+                        {(["bt", "ht", "fc", "bm"] as MethodKey[]).map(m => methodBtn(m, methodB === m, () => selectB(m)))}
                     </div>
                 </div>
                 <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>

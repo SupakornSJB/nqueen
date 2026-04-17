@@ -52,30 +52,53 @@ src/
 | `charts`  | `ChartsView`  | 5th          | Bar charts comparing step counts across N = 4–8        |
 | `faq`     | `FaqView`     | 6th          | Static FAQ                                              |
 
-Playback controls (N selector, speed) are hidden in `home`, `charts`, `about`, and `faq` modes. Algorithm picker and playback buttons are in a separate card from N/Speed in single mode (matches compare mode layout).
+Playback controls (N selector, speed) are hidden in `home`, `charts`, `about`, and `faq` modes. Algorithm picker and playback buttons are in a separate card from N/Speed in single mode (matches compare mode layout). Clicking Back or Step always pauses playback.
 
 ### Algorithm layer (`src/lib/algorithms.ts`)
 
-Three pure step-recorder functions (no React). Steps are pre-computed on mount / N change; playback just advances `currentIdx` through the frozen array.
+Four pure step-recorder functions (no React). Steps are pre-computed on mount / N change; playback just advances `currentIdx` through the frozen array.
 
-- **`buildSteps(n)`** — classic backtracking; emits `enter | check | place | conflict | backtrack | exhaust | solution` steps
-- **`buildStepsFC(n)`** — forward-checking variant; propagates domain pruning before each placement, skips branches where any future row loses all valid columns
-- **`buildStepsBM(n)`** — bitmask variant; uses integer bitmasks for O(1) conflict detection, never visits invalid cells
-- **`buildMethodSteps(method, n)`** — dispatcher for `MethodKey` (`"bt" | "fc" | "bm"`)
-- **`countStepsTotal(method, n)`** — lightweight counter (no Step allocation); used by the complexity Web Worker for timing large N
+- **`buildSteps(n)`** — naive backtracking; O(N) isSafe scan per check; emits `enter | check | place | conflict | backtrack | exhaust | solution` steps
+- **`buildStepsHT(n)`** — hash set backtracking; O(1) conflict check via three `Set<number>` objects (colSet / diagSet / antiDiagSet); same search tree as BT; emits the same step types
+- **`buildStepsFC(n)`** — forward-checking; propagates domain pruning before each placement; emits `prune` instead of `conflict` for forward-looking rejections
+- **`buildStepsBM(n)`** — bitmask; integer bitmasks for O(1) conflict detection, never visits invalid cells
+- **`buildMethodSteps(method, n)`** — dispatcher for `MethodKey` (`"bt" | "ht" | "fc" | "bm"`)
+- **`countStepsTotal(method, n)`** — allocation-free counter used by the complexity Web Worker; HT and FC use integer bitmask / undo-stack implementations for benchmark accuracy
 - **`getAllSolutions(n)`** — enumerates all valid boards for the solutions gallery
 - **`getCellState(step, row, col)`** — maps a step + grid position to a `CellState` for board rendering
-- **`countStepStats(steps, upTo)`** — accumulates checks / placements / conflicts / backtracks / `avgDepth` up to a given index
+- **`countStepStats(steps, upTo)`** — accumulates checks / placements / conflicts / backtracks / `avgDepth` up to a given index; counts `prune` steps as conflicts
+
+### Step types and VisitedState
+
+`StepType`: `enter | check | place | conflict | prune | backtrack | exhaust | solution`
+
+- `conflict` — direct queen attack detected at the current cell (BT / HT)
+- `prune` — forward-checking rejection: cell is safe now but would empty a future row's domain (FC only)
+
+`VisitedState` (used by DecisionTree): `place | conflict | prune | solution`
+
+Decision Tree colors: blue = placed, red = conflict, orange = pruned (FC), green = solution, grey = unvisited. On backtrack, the backtracked node and all nodes in deeper rows are cleared back to unvisited.
+
+### Complexity & time
+
+| Key | Time      | Space  | Notes |
+|-----|-----------|--------|-------|
+| bt  | O(N·N!)   | O(N)   | O(N) isSafe loop × O(N!) nodes |
+| ht  | O(N!)     | O(N)   | O(1) set check × same O(N!) nodes as BT |
+| fc  | O(N!)     | O(N²)  | N domain sets × N values; worst-case same node count as BT |
+| bm  | O(N!)     | O(N)   | O(1) bit ops; never visits invalid cells |
+
+`countStepsTotal` and `countAlgoStatsFast` use integer bitmask implementations for HT and FC (no JS Set/object allocation) to give accurate wall-clock benchmarks. `buildStepsHT` / `buildStepsFC` use real Set objects so the decision log can show human-readable set contents.
 
 ### Complexity chart & Web Worker (`src/store/complexityStore.ts`, `src/workers/complexity.worker.ts`)
 
-The Algorithms page runs one background worker per method (bt / fc / bm) the moment the page is opened. Workers:
+The Algorithms page runs one background worker per method (bt / ht / fc / bm) the moment the page is opened. Workers:
 - Use adaptive batching (600× for N=4, 1× for N=12+) to amortise timer resolution
 - Stream `{ type: 'progress' }` messages after each N so the UI progress bar updates live
 - Post a final `{ type: 'result' }` message with all data
 - Results are cached in the Zustand store (`complexityStore`) — survives page navigation and card collapse/expand
 
-N ranges per method: BT = 4–14, FC = 4–14, BM = 4–15.
+N ranges per method: BT = 4–14, HT = 4–14, FC = 4–13, BM = 4–15.
 
 The chart uses **semi-log scale** (linear X = N, log Y = relative runtime):
 - N-Queens step counts grow approximately exponentially (`k^N`, not polynomially `N^k`)

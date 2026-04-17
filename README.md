@@ -1,6 +1,6 @@
 # N-Queens Visualizer
 
-An interactive step-by-step visualizer for three N-Queens solving algorithms, built with React 19 + TypeScript + Vite.
+An interactive step-by-step visualizer for four N-Queens solving algorithms, built with React 19 + TypeScript + Vite.
 
 ## Getting Started
 
@@ -24,16 +24,29 @@ Nav bar order: **Home → Algorithms → Single → Compare → Charts → FAQ**
 | **Algorithms** | Expandable cards for each algorithm with plain-English explanations, comparison summaries, and a live time-complexity chart (scatter + exponential best-fit vs O(N!) reference, computed in a Web Worker) |
 | **Single** | Step through one algorithm at your own pace with playback controls, a scrubber, and four analysis tabs: Decision log, Call stack, Tree view, Depth chart |
 | **Compare** | Race any two algorithms side-by-side at the same step cadence; efficiency comparison table includes avg depth |
-| **Charts** | 2×4 bar chart grid + raw data table comparing all three algorithms across N = 4–8, including runtime in µs |
+| **Charts** | 2×4 bar chart grid + raw data table comparing all four algorithms across N = 4–8, including runtime in µs |
 | **FAQ** | Accordion Q&A covering the problem, algorithms, metrics, and visualizer features |
 
 ## Algorithms
 
-| Key | Name | Complexity | Highlight |
-|-----|------|------------|-----------|
-| `bt` | Backtracking | O(N!) time · O(N) space | Simplest; checks every cell and backtracks on conflict |
-| `fc` | Forward Checking | O(N!) time · O(N²) space | Maintains per-row domains; prunes when any future row empties |
-| `bm` | Bitmask | O(N!) time · O(N) space | Integer bitmasks for O(1) conflict detection; never visits invalid cells |
+| Key | Name | Time | Space | Highlight |
+|-----|------|------|-------|-----------|
+| `bt` | Naive Backtracking | O(N·N!) | O(N) | Simplest; O(N) isSafe scan per check, backtracks on conflict |
+| `ht` | Hash Backtracking | O(N!) | O(N) | Same search tree as BT; O(1) conflict check via three hash sets (col / diag / anti-diag) |
+| `fc` | Forward Checking | O(N!) | O(N²) | Maintains per-row domains; prunes when any future row's domain empties |
+| `bm` | Bitmask | O(N!) | O(N) | Integer bitmasks for O(1) conflict detection; never visits invalid cells |
+
+N ranges: BT = 4–14, HT = 4–14, FC = 4–13, BM = 4–15.
+
+## Decision Tree colors
+
+| Color | Meaning |
+|-------|---------|
+| Blue | Currently placed queen |
+| Red | Direct conflict (BT / HT) |
+| Orange | Pruned by forward look-ahead (FC only) |
+| Green | Part of a found solution |
+| Grey | Not yet visited |
 
 ## Source layout
 
@@ -45,7 +58,8 @@ src/
   lib/
     types.ts                  — shared TypeScript types (Step, CellState, MethodKey, TabKey…)
     constants.ts              — CELL colours, TYPE_META, SPEED_MS, METHOD_META
-    algorithms.ts             — buildSteps, buildStepsFC, buildStepsBM, countStepsTotal, helpers
+    algorithms.ts             — buildSteps, buildStepsHT, buildStepsFC, buildStepsBM,
+                                countStepsTotal, getAllSolutions, getCellState, countStepStats
   store/
     complexityStore.ts        — Zustand store; owns Web Worker lifecycle + result cache
   workers/

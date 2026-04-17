@@ -15,6 +15,7 @@ export const TYPE_META: Record<StepType, TypeMeta> = {
     check:     { label: "Check",     dot: "var(--color-text-info)",    tagBg: "var(--color-background-info)",    tagText: "var(--color-text-info)",    tagBorder: "var(--color-border-info)" },
     place:     { label: "Place",     dot: "var(--color-text-success)", tagBg: "var(--color-background-success)", tagText: "var(--color-text-success)", tagBorder: "var(--color-border-success)" },
     conflict:  { label: "Conflict",  dot: "var(--color-text-danger)",  tagBg: "var(--color-background-danger)",  tagText: "var(--color-text-danger)",  tagBorder: "var(--color-border-danger)" },
+    prune:     { label: "Prune",     dot: "var(--color-text-warning)", tagBg: "var(--color-background-warning)", tagText: "var(--color-text-warning)", tagBorder: "var(--color-border-warning)" },
     backtrack: { label: "Backtrack", dot: "var(--color-text-warning)", tagBg: "var(--color-background-warning)", tagText: "var(--color-text-warning)", tagBorder: "var(--color-border-warning)" },
     exhaust:   { label: "Exhaust",   dot: "var(--color-text-danger)",  tagBg: "var(--color-background-danger)",  tagText: "var(--color-text-danger)",  tagBorder: "var(--color-border-danger)" },
     solution:  { label: "Solution",  dot: "var(--color-text-success)", tagBg: "var(--color-background-success)", tagText: "var(--color-text-success)", tagBorder: "var(--color-border-success)" },
@@ -24,14 +25,21 @@ export const SPEED_MS: Record<SpeedKey, number> = { slow: 600, medium: 200, fast
 
 export const METHOD_META: Record<MethodKey, { name: string; desc: string; accent: string; accentBg: string; accentBorder: string }> = {
     bt: {
-        name: "Backtracking",
+        name: "Naive Backtracking",
         desc: "Tries every column, backtracks only on direct queen conflict",
         accent: "#f59e0b",
         accentBg: "rgba(245,158,11,0.10)",
         accentBorder: "rgba(245,158,11,0.38)",
     },
+    ht: {
+        name: "Hash Backtracking",
+        desc: "Same search tree as naive BT but O(1) conflict detection via three hash sets",
+        accent: "#06b6d4",
+        accentBg: "rgba(6,182,212,0.10)",
+        accentBorder: "rgba(6,182,212,0.38)",
+    },
     fc: {
-        name: "Forward Checking (Pruning)",
+        name: "Forward Checking",
         desc: "Prunes branches when any future row loses all valid columns",
         accent: "#10b981",
         accentBg: "rgba(16,185,129,0.10)",

@@ -29,12 +29,28 @@ const SECTIONS: FaqSection[] = [
         title: "The Algorithms",
         items: [
             {
-                q: "How does Backtracking work?",
-                a: "Backtracking tries each column left-to-right in the current row. Before placing, it checks all previously placed queens for column or diagonal conflicts. If safe, it places the queen and recurses to the next row. If no column in a row is safe, it removes the previous queen and tries the next column there — the 'backtrack' step. It is correct and simple but explores many states that are doomed to fail.",
+                q: "How does Naive Backtracking work?",
+                a: "Naive Backtracking tries each column left-to-right in the current row. Before placing, it scans all previously placed queens with an O(row) loop to check for column or diagonal conflicts. If safe, it places the queen and recurses to the next row. If no column in a row is safe, it removes the previous queen and tries the next column there — the 'backtrack' step. It is correct and simple but the O(N) scan per check means its time complexity is O(N·N!), not O(N!).",
+            },
+            {
+                q: "How does Hash Backtracking improve on Naive Backtracking?",
+                a: "Hash Backtracking keeps three hash sets — one for occupied columns, one for diagonals (row−col), one for anti-diagonals (row+col). Checking safety becomes three O(1) set lookups instead of an O(N) loop scan. The search tree is identical to Naive BT (same nodes, same order), so step counts are equal. The only difference is per-node cost: O(1) vs O(N). This reduces the overall time complexity from O(N·N!) to O(N!) while keeping the same O(N) space.",
+            },
+            {
+                q: "Does Naive Backtracking visit the same nodes as Hash Backtracking?",
+                a: "Yes — exactly the same nodes in exactly the same order. Both try every column left-to-right and apply the same conflict logic, so the search tree is structurally identical. The step counts are always equal between the two. The sole difference is speed: Hash BT evaluates each node in O(1) while Naive BT uses an O(N) scan.",
             },
             {
                 q: "What does Forward Checking add?",
                 a: "After placing a queen, Forward Checking propagates the constraints forward: it removes the newly attacked columns from the valid-column sets ('domains') of all future rows. If any future row's domain becomes empty, the placement is rejected immediately — no recursion needed. This 'look-ahead' pruning eliminates entire subtrees before they are explored, reducing the step count by 40–70% vs plain backtracking.",
+            },
+            {
+                q: "What is the difference between a Conflict step and a Prune step?",
+                a: "A Conflict (red in the tree) means the cell being tested is already directly attacked by a placed queen — same column, same diagonal, or same anti-diagonal. The problem is immediate and local. A Prune (orange, Forward Checking only) means the cell is not currently attacked, but placing a queen there would leave some future row with zero valid columns — it creates an unsolvable future. Conflicts are detected at the current cell; pruned positions are rejected because of downstream consequences.",
+            },
+            {
+                q: "Why can Bitmask sometimes have more steps than Forward Checking?",
+                a: "Bitmask pre-filters the current row — it only tries positions that are not immediately attacked. But it has no look-ahead: it will still recurse into placements that doom a future row. Forward Checking, by contrast, simulates each placement and rejects it if any future row's domain would become empty. This look-ahead eliminates entire subtrees that Bitmask still enters and eventually backtracks through. At moderate-to-large N the FC look-ahead saves more total work than the BM bitmask pre-filter, so FC can have a lower step count despite Bitmask's faster per-step speed.",
             },
             {
                 q: "How does the Bitmask approach work?",
@@ -42,15 +58,15 @@ const SECTIONS: FaqSection[] = [
             },
             {
                 q: "Why does Bitmask always show 0 conflicts?",
-                a: "In Backtracking and Forward Checking, the algorithm checks a position and then decides whether to reject it. In Bitmask, only valid positions are enumerated in the first place — the mask pre-filters them. There is no 'check then reject' loop, so the conflict counter stays at zero by design.",
+                a: "In Naive BT and Hash BT, the algorithm checks a position and then decides whether to reject it. In Bitmask, only valid positions are enumerated in the first place — the mask pre-filters them. There is no 'check then reject' loop, so the conflict counter stays at zero by design.",
             },
             {
-                q: "Are all three algorithms guaranteed to find all solutions?",
-                a: "Yes. All three are complete — they explore the same solution set and find every valid placement. They differ only in how efficiently they prune the search space. The step counts differ, but the final solution sets are identical.",
+                q: "Are all four algorithms guaranteed to find all solutions?",
+                a: "Yes. All four are complete — they explore the same solution set and find every valid placement. They differ only in how efficiently they traverse and prune the search space. The step counts differ, but the final solution sets are identical.",
             },
             {
                 q: "Which algorithm should I use in practice?",
-                a: "For competitive programming or maximum performance: Bitmask. For educational understanding of constraint propagation: Forward Checking. For the simplest implementation to study or verify: Backtracking. The bitmask version is the standard competitive-programming technique for N-Queens.",
+                a: "For competitive programming or maximum performance: Bitmask. For understanding constraint propagation and look-ahead: Forward Checking. For learning the O(1) data-structure optimisation: Hash Backtracking. For the simplest implementation to study or verify: Naive Backtracking. The bitmask version is the standard competitive-programming technique for N-Queens.",
             },
         ],
     },
@@ -59,7 +75,7 @@ const SECTIONS: FaqSection[] = [
         items: [
             {
                 q: "What do the step event types mean?",
-                a: "Enter: the algorithm moves to a new row. Check: a candidate column is being evaluated. Place: a queen is placed successfully. Conflict: the candidate was rejected (BT/FC only). Backtrack: a queen is removed to try the next column. Exhaust: all candidates in a row failed, triggering a backtrack from the row above. Solution: all N queens are placed.",
+                a: "Enter: the algorithm moves to a new row. Check: a candidate column is being evaluated. Place: a queen is placed successfully. Conflict: the candidate was rejected due to a direct attack (BT and HT only). Prune: the candidate was rejected because it would make a future row unsolvable — look-ahead rejection (FC only). Backtrack: a queen is removed to try the next column. Exhaust: all candidates in a row failed, triggering a backtrack from the row above. Solution: all N queens are placed.",
             },
             {
                 q: "What is 'check efficiency'?",
@@ -78,8 +94,8 @@ const SECTIONS: FaqSection[] = [
                 a: "The N-Queens search space is O(N!) in the worst case. Even with pruning, the number of recursive calls grows super-exponentially. Each increment in N roughly multiplies the step count by 5–10×, which is why N=8 has thousands of times more steps than N=4.",
             },
             {
-                q: "Why is Forward Checking sometimes slower in wall-clock time than Backtracking, even though it has fewer steps?",
-                a: "Step count measures the number of algorithm events, not the cost of each event. Forward Checking visits fewer nodes, but each node does more work: before recursing it copies the valid-column sets ('domains') for all N future rows. That copy operation is O(N²) per placement. At small N (4–5), the per-node overhead from these copies exceeds the savings from visiting fewer nodes, so FC wall-clock time can be higher than BT despite a lower step count. At N=7–8, the branch pruning is so aggressive that total work finally drops below BT. Bitmask avoids both the O(row) conflict scan of BT and the domain copying of FC, which is why it is fastest at every N.",
+                q: "Why are Hash Backtracking and Forward Checking sometimes slower than Naive Backtracking in wall-clock time?",
+                a: "Step count and wall-clock time are different things. Hash BT and FC can be slower at small N for different reasons. Hash BT uses JavaScript Set objects, which carry heap allocation and GC overhead. For N ≤ 7 the O(N) isSafe loop in Naive BT is only 1–6 iterations — tight sequential array reads that JIT compilers execute extremely fast — making the Set overhead dominate. Forward Checking's per-node cost is even heavier: it copies N domain sets (O(N²) work) before every candidate. At small N the pruning savings don't compensate for this. FC wall-clock typically crosses below BT around N=7–8 where branch elimination becomes aggressive enough. Bitmask avoids both problems: pure O(1) integer operations, zero allocations.",
             },
         ],
     },
@@ -96,7 +112,7 @@ const SECTIONS: FaqSection[] = [
             },
             {
                 q: "What is the Decision Tree showing?",
-                a: "The tree visualizes which (row, column) cells have been visited and their outcome. Blue = active or placed, red = conflict, green = part of a solution, grey = not yet visited. It's limited to N ≤ 6 because larger boards produce too many nodes to render clearly.",
+                a: "The tree visualizes which (row, column) cells have been visited and their outcome. Blue = currently placed queen, red = direct conflict (BT/HT), orange = pruned by forward look-ahead (FC only), green = part of a found solution, grey = not yet visited. When the algorithm backtracks, the cells for that branch are cleared back to grey. Limited to N ≤ 6 because larger boards produce too many nodes to render clearly.",
             },
             {
                 q: "Why does the 'Solutions' button in Single mode show a fraction?",

@@ -1,9 +1,9 @@
-export type StepType = "enter" | "check" | "place" | "conflict" | "backtrack" | "exhaust" | "solution";
+export type StepType = "enter" | "check" | "place" | "conflict" | "prune" | "backtrack" | "exhaust" | "solution";
 export type CellState = "empty" | "queen" | "checking" | "conflict" | "backtrack" | "solution";
 export type SpeedKey = "slow" | "medium" | "fast" | "vfast";
 export type TabKey = "log" | "stack" | "tree" | "depth";
-export type VisitedState = "place" | "conflict" | "backtrack" | "solution";
-export type MethodKey = "bt" | "fc" | "bm";
+export type VisitedState = "place" | "conflict" | "prune" | "solution";
+export type MethodKey = "bt" | "ht" | "fc" | "bm";
 
 export interface Step {
     type: StepType;

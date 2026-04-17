@@ -227,8 +227,19 @@ export function DecisionTree({ steps, currentIdx, n }: { steps: Step[]; currentI
         const key = `${s.row}-${s.col}`;
         if (s.type === "place") visited[key] = "place";
         else if (s.type === "conflict" || s.type === "exhaust") visited[key] ??= "conflict";
-        else if (s.type === "backtrack") visited[key] = "backtrack";
-        else if (s.type === "solution") {
+        else if (s.type === "prune") visited[key] ??= "prune";
+        else if (s.type === "backtrack") {
+            // Clear the backtracked node and ALL nodes in rows below (entire branch unwound)
+            delete visited[key];
+            for (let r = s.row + 1; r < n; r++) {
+                for (let c = 0; c < n; c++) delete visited[`${r}-${c}`];
+            }
+            // Queens above this row are still placed — reset any "solution" green back to "place"
+            for (let r = 0; r < s.row; r++) {
+                const c = s.board[r];
+                if (c >= 0 && visited[`${r}-${c}`] === "solution") visited[`${r}-${c}`] = "place";
+            }
+        } else if (s.type === "solution") {
             for (let r = 0; r < n; r++) visited[`${r}-${s.board[r]}`] = "solution";
         }
     }
@@ -236,18 +247,19 @@ export function DecisionTree({ steps, currentIdx, n }: { steps: Step[]; currentI
     const cur = steps[currentIdx];
     const activeKey = cur ? `${cur.row}-${cur.col}` : null;
 
-    const rowH = 52;
+    const rowH = 40;
     const colW = Math.max(32, Math.min(48, 320 / n));
     const svgW = n * colW + 40;
-    const svgH = n * rowH + 20;
+    const svgH = n * rowH + 8;
     const cx = (col: number) => 20 + col * colW + colW / 2;
-    const cy = (row: number) => 20 + row * rowH + rowH / 2;
+    const cy = (row: number) => 8 + row * rowH + rowH / 2;
 
     const nodeColor = (row: number, col: number): NodeColor => {
         const v = visited[`${row}-${col}`];
         if (!v) return { fill: "var(--color-background-secondary)", stroke: "var(--color-border-tertiary)", text: "var(--color-text-tertiary)" };
         if (v === "solution")  return { fill: "var(--color-background-success)", stroke: "var(--color-border-success)", text: "var(--color-text-success)" };
-        if (v === "place" || v === "backtrack") return { fill: "var(--color-background-info)", stroke: "var(--color-border-info)", text: "var(--color-text-info)" };
+        if (v === "place") return { fill: "var(--color-background-info)", stroke: "var(--color-border-info)", text: "var(--color-text-info)" };
+        if (v === "prune") return { fill: "var(--color-background-warning)", stroke: "var(--color-border-warning)", text: "var(--color-text-warning)" };
         return { fill: "var(--color-background-danger)", stroke: "var(--color-border-danger)", text: "var(--color-text-danger)" };
     };
 
@@ -260,15 +272,6 @@ export function DecisionTree({ steps, currentIdx, n }: { steps: Step[]; currentI
                         const active = activeKey === `${row}-${col}`;
                         return (
                             <g key={`${row}-${col}`}>
-                                {row > 0 && (
-                                    <line
-                                        x1={cx(col)} y1={cy(row) - rowH / 2}
-                                        x2={cx(col)} y2={cy(row - 1) + 10}
-                                        stroke={visited[`${row}-${col}`] ? c.stroke : "var(--color-border-tertiary)"}
-                                        strokeWidth={0.5}
-                                        strokeDasharray={visited[`${row}-${col}`] ? undefined : "3 3"}
-                                    />
-                                )}
                                 <rect
                                     x={cx(col) - colW / 2 + 3} y={cy(row) - 13}
                                     width={colW - 6} height={26} rx={5}
@@ -291,8 +294,9 @@ export function DecisionTree({ steps, currentIdx, n }: { steps: Step[]; currentI
             </svg>
             <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 8 }}>
                 {[
-                    { bg: "var(--color-background-info)",      border: "var(--color-border-info)",      label: "Active" },
+                    { bg: "var(--color-background-info)",      border: "var(--color-border-info)",      label: "Placed" },
                     { bg: "var(--color-background-danger)",    border: "var(--color-border-danger)",    label: "Conflict" },
+                    { bg: "var(--color-background-warning)",   border: "var(--color-border-warning)",   label: "Pruned (FC)" },
                     { bg: "var(--color-background-success)",   border: "var(--color-border-success)",   label: "Solution" },
                     { bg: "var(--color-background-secondary)", border: "var(--color-border-tertiary)",  label: "Unvisited" },
                 ].map(({ bg, border, label }) => (

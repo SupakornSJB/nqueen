@@ -9,13 +9,22 @@ interface AlgoDesc { complexity: string; paragraphs: string[]; comparison: strin
 
 const DESCRIPTIONS: Record<MethodKey, AlgoDesc> = {
     bt: {
+        complexity: "O(N·N!) time  ·  O(N) space",
+        paragraphs: [
+            "Naive Backtracking is the simplest correct approach to the N-Queens problem. It works row by row: for each row it tries every column from left to right. Before placing a queen it scans all queens already placed and checks for column or diagonal conflicts — if none exist, the queen is placed and the algorithm recurses to the next row.",
+            "When no column in the current row is safe, the algorithm backtracks: it removes the queen placed in the previous row and resumes trying the next column from where it left off. This continues until all N queens are placed (a solution is found) or every possibility is exhausted.",
+            "The time complexity is O(N·N!), not O(N!): the isSafe loop scans up to N already-placed queens per check, adding an O(N) factor on top of the O(N!) search tree. Space is O(N) because queens are stored in a 1-D array (board[row] = col) and the call stack depth is at most N.",
+        ],
+        comparison: "vs Hash Backtracking: same step count (identical search tree) but HT reduces time from O(N·N!) to O(N!) by replacing the O(N) isSafe scan with O(1) set lookups. vs Forward Checking: BT generates roughly 3–4× more steps at N=8 because it never prunes based on future feasibility. vs Bitmask: BT generates 4–6× more steps because it checks invalid positions explicitly.",
+    },
+    ht: {
         complexity: "O(N!) time  ·  O(N) space",
         paragraphs: [
-            "Backtracking is the simplest correct approach to the N-Queens problem. It works row by row: for each row it tries every column from left to right. Before placing a queen it scans all queens already placed and checks for column or diagonal conflicts — if none exist, the queen is placed and the algorithm recurses to the next row.",
-            "When no column in the current row is safe, the algorithm backtracks: it removes the queen placed in the previous row and resumes trying the next column from where it left off. This continues until all N queens are placed (a solution is found) or every possibility is exhausted.",
-            "The key weakness is that it reacts to conflicts only after they occur. Every column in every row is evaluated, including many that are doomed to fail. For N = 8 this means hundreds of thousands of individual checks.",
+            "Hash Backtracking is a direct upgrade to the naive approach that changes only the data structure used for conflict detection. Three hash sets are maintained: one for occupied columns, one for occupied diagonals (row − col), and one for anti-diagonals (row + col). Checking whether a cell is safe becomes three O(1) set-membership tests instead of an O(N) loop scan.",
+            "Because the hash sets mirror exactly which positions are attacked, the search tree is identical to naive backtracking — the same branches are explored in the same order, and the step counts are equal. The sole difference is how quickly each individual node is evaluated. This makes it the clearest example of how a data-structure choice alone (array scan → hash set) improves runtime without altering the algorithm's logic.",
+            "Space is O(N): at most N entries are live in each set at any time. Crucially, this is the same asymptotic space as BT but with a strictly better time complexity — O(N!) vs BT's O(N·N!) — because each conflict check drops from O(N) to O(1).",
         ],
-        comparison: "vs Forward Checking: BT generates roughly 3–4× more steps at N=8 because it never prunes based on future feasibility. vs Bitmask: BT generates 4–6× more steps because it checks invalid positions explicitly. BT has the highest conflict rate of all three algorithms.",
+        comparison: "vs Naive Backtracking: identical step count (same search tree) but ~2–4× faster in wall-clock time at moderate N because conflict checks drop from O(N) to O(1). vs Forward Checking: same or more steps than FC because no domain pruning is performed. vs Bitmask: BM remains faster — it pre-filters invalid candidates so only safe positions are ever visited, whereas hash backtracking still tries all N columns per row.",
     },
     fc: {
         complexity: "O(N!) time  ·  O(N²) space",
@@ -24,22 +33,23 @@ const DESCRIPTIONS: Record<MethodKey, AlgoDesc> = {
             "This early pruning eliminates large subtrees from the search space before they are explored. Rows that backtracking would visit thousands of times are cut off as soon as they become unsatisfiable, which is why the step count is substantially lower than plain backtracking.",
             "The trade-off is memory: forward checking must copy the domain sets on each recursive call (O(N²) per level), whereas backtracking needs only O(N) for the board array. For small N the extra memory is negligible, but it grows with problem size.",
         ],
-        comparison: "vs Backtracking: FC uses roughly 3–4× fewer steps at N=8 due to look-ahead pruning. vs Bitmask: FC uses 1.5–2.5× more steps because it still iterates over domain candidates explicitly and copies domain arrays. FC's conflict rate is lower than BT but non-zero; Bitmask's is always 0%.",
+        comparison: "vs Naive Backtracking: FC uses roughly 3–4× fewer steps at N=8 due to look-ahead pruning. vs Hash Backtracking: same pruning advantage; step counts are identical to FC vs BT ratio. vs Bitmask: FC uses 1.5–2.5× more steps because it iterates over domain candidates explicitly and copies domain arrays. FC's conflict rate is lower than BT/HT but non-zero; Bitmask's is always 0%.",
     },
     bm: {
         complexity: "O(N!) time  ·  O(N) space",
         paragraphs: [
             "The Bitmask approach represents attacked columns as integers. Three bitmasks track which columns are blocked: cols for vertical attacks, diag1 for left-leaning diagonals, and diag2 for right-leaning diagonals. For any given row, all safe columns are computed in a single bitwise operation: full & ~(cols | diag1 | diag2), where full is a mask of all N column bits.",
             "Only positions present in that bitmask are ever visited — the algorithm never checks a cell only to reject it. When moving to the next row the diagonal masks are each shifted by one bit to account for the row offset. This means zero explicit conflict-checking steps appear in the trace; the mask pre-filters them out entirely.",
-            "Because every operation is O(1) bit arithmetic, and no invalid positions are visited, the bitmask approach has the smallest step count of the three methods shown here. It is the standard technique used in competitive-programming solutions where N-Queens needs to run at maximum speed.",
+            "Because every operation is O(1) bit arithmetic, and no invalid positions are visited, the bitmask approach has the smallest step count of all four methods. It is the standard technique used in competitive-programming solutions where N-Queens needs to run at maximum speed.",
         ],
-        comparison: "Bitmask has the fewest steps of all three. Its conflict rate is always 0% and its check efficiency approaches 100% because only valid positions are tried. At N=8, BM uses roughly 4–6× fewer steps than BT and 1.5–2.5× fewer than FC.",
+        comparison: "Bitmask has the fewest steps of all four methods. Its conflict rate is always 0% and its check efficiency approaches 100% because only valid positions are tried. At N=8, BM uses roughly 4–6× fewer steps than BT/HT and 1.5–2.5× fewer than FC.",
     },
 };
 
 // Per-method N ranges.  BM is pure bit-ops so it stays fast at higher N.
 const NS_FOR_METHOD: Record<MethodKey, number[]> = {
     bt: [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14],
+    ht: [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14],
     fc: [4, 5, 6, 7, 8, 9, 10, 11, 12, 13],
     bm: [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
 };
@@ -329,10 +339,10 @@ export function AboutView() {
     // Kick off all three workers as soon as this page is opened.
     // Workers that are already running or done are silently skipped.
     useEffect(() => {
-        (["bt", "fc", "bm"] as MethodKey[]).forEach(m => startIfNeeded(m, NS_FOR_METHOD[m]));
+        (["bt", "ht", "fc", "bm"] as MethodKey[]).forEach(m => startIfNeeded(m, NS_FOR_METHOD[m]));
     }, [startIfNeeded]);
 
-    const methods: MethodKey[] = ["bt", "fc", "bm"];
+    const methods: MethodKey[] = ["bt", "ht", "fc", "bm"];
 
     return (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>

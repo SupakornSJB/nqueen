@@ -42,31 +42,65 @@ function countAlgoStatsFast(n: number, method: MethodKey): AlgoStats {
             totalSteps++; depthSum += row;
         };
         solve(0);
-    } else if (method === "fc") {
+    } else if (method === "ht") {
         const board = Array<number>(n).fill(-1);
-        const solve = (row: number, domains: Set<number>[]): void => {
+        let colMask = 0, diagMask = 0, antiMask = 0;
+        const solve = (row: number): void => {
             if (row === n) { totalSteps++; depthSum += row; return; }
-            const validCols = Array.from(domains[row]).sort((a, b) => a - b);
             totalSteps++; depthSum += row;
-            for (const col of validCols) {
+            for (let col = 0; col < n; col++) {
+                const dIdx = row - col + n - 1;
+                const aIdx = row + col;
                 checks++; totalSteps++; depthSum += row;
-                const nd = domains.map(s => new Set(s));
-                let ok = true;
-                for (let r = row + 1; r < n; r++) {
-                    const d = r - row;
-                    nd[r].delete(col); nd[r].delete(col - d); nd[r].delete(col + d);
-                    if (nd[r].size === 0) { ok = false; break; }
-                }
-                if (ok) {
+                if (!((colMask >> col) & 1) && !((diagMask >> dIdx) & 1) && !((antiMask >> aIdx) & 1)) {
                     placements++; totalSteps++; depthSum += row;
-                    board[row] = col; solve(row + 1, nd); board[row] = -1;
+                    board[row] = col;
+                    colMask |= 1 << col; diagMask |= 1 << dIdx; antiMask |= 1 << aIdx;
+                    solve(row + 1);
+                    board[row] = -1;
+                    colMask &= ~(1 << col); diagMask &= ~(1 << dIdx); antiMask &= ~(1 << aIdx);
                     backtracks++; totalSteps++; depthSum += row;
                 } else { conflicts++; totalSteps++; depthSum += row; }
             }
             totalSteps++; depthSum += row;
         };
-        const init = Array.from({ length: n }, () => new Set(Array.from({ length: n }, (_, i) => i)));
-        solve(0, init);
+        solve(0);
+    } else if (method === "fc") {
+        const board = Array<number>(n).fill(-1);
+        const full = (1 << n) - 1;
+        const domains = Array<number>(n).fill(full);
+        const undoR = new Int32Array(n * n);
+        const undoV = new Int32Array(n * n);
+        let undoTop = 0;
+        const solve = (row: number): void => {
+            if (row === n) { totalSteps++; depthSum += row; return; }
+            totalSteps++; depthSum += row;
+            let mask = domains[row];
+            while (mask) {
+                const bit = mask & (-mask); mask &= mask - 1;
+                const col = 31 - Math.clz32(bit);
+                checks++; totalSteps++; depthSum += row;
+                const savedTop = undoTop;
+                let ok = true;
+                for (let r = row + 1; r < n; r++) {
+                    const d = r - row;
+                    const prev = domains[r];
+                    let next = prev & ~(1 << col);
+                    if (col - d >= 0) next &= ~(1 << (col - d));
+                    if (col + d < n)  next &= ~(1 << (col + d));
+                    if (next !== prev) { undoR[undoTop] = r; undoV[undoTop++] = prev; domains[r] = next; }
+                    if (next === 0) { ok = false; break; }
+                }
+                if (ok) {
+                    placements++; totalSteps++; depthSum += row;
+                    board[row] = col; solve(row + 1); board[row] = -1;
+                    backtracks++; totalSteps++; depthSum += row;
+                } else { conflicts++; totalSteps++; depthSum += row; }
+                while (undoTop > savedTop) domains[undoR[--undoTop]] = undoV[undoTop];
+            }
+            totalSteps++; depthSum += row;
+        };
+        solve(0);
     } else {
         const board = Array<number>(n).fill(-1);
         const full = (1 << n) - 1;
@@ -222,36 +256,38 @@ function pct(num: number, den: number) {
 }
 
 const CHART_INSIGHTS: Record<string, string> = {
-    totalSteps: "BT generates the most steps because every row tries all N columns and conflicts are detected after the fact. FC cuts this by 40–70% through domain pruning. BM is similar to or lower than FC — the mask pre-filters invalid columns so only safe positions are ever visited.",
-    checks: "BT checks all N candidates per row regardless of feasibility. FC checks only the remaining domain columns. BM checks only the bitmask-filtered safe positions — at N=8 this averages 4–5 columns per row instead of 8.",
-    conflicts: "Each BT conflict is one wasted check. Each FC conflict represents an entire subtree pruned early — higher value per event. BM always shows 0 conflicts: the bitmask guarantees every candidate is valid before it is tried.",
-    backtracks: "All three algorithms backtrack roughly proportionally because they find the same solution set. BM and FC arrive at solutions via shorter paths, but the total backtrack count follows a similar shape. Differences are smaller here than in checks or conflicts.",
-    efficiency: "Check efficiency = placements ÷ checks × 100. BM approaches 100% at all N because every position it checks is guaranteed safe. BT is lowest — many checks end in rejection. FC is intermediate; domain filtering removes obvious conflicts but not all.",
-    conflictRate: "Conflict rate = conflicts ÷ checks × 100. BM is always 0%. The gap between BT and FC shows how much domain propagation reduces wasted checking. At N=8, BT wastes roughly 50–70% of its checks on positions it will reject.",
-    candPerRow: "Average candidates per row = checks ÷ N. BT always equals N (tries every column). BM stays significantly below N because the mask pre-filters safe columns. FC is between the two. The gap widens as N grows, showing how much more selective BM and FC are.",
-    runtimeMs: "Wall-clock time in µs per run, averaged over multiple trials. BM is fastest at every N because all conflict detection is O(1) bit arithmetic. BT is simple O(row) scans and is usually second. Notably, Forward Checking (Pruning) is often the slowest at small N despite having fewer steps — each node copies the domain sets for all future rows (O(N²) per placement), and that per-node overhead outweighs the pruning savings when N is small. At N=7–8 the heavy branch pruning finally compensates. If FC runtime looks worse than BT in this chart at N=4–5, that is expected and explained by the domain-copy cost.",
+    totalSteps: "BT and HT share the same step count because they explore an identical search tree — the only difference is how fast each node is evaluated. FC cuts this by 40–70% through domain pruning. BM is similar to or lower than FC — the mask pre-filters invalid columns so only safe positions are ever visited.",
+    checks: "BT and HT check all N candidates per row regardless of feasibility (same search tree). FC checks only the remaining domain columns. BM checks only the bitmask-filtered safe positions — at N=8 this averages 4–5 columns per row instead of 8.",
+    conflicts: "BT and HT share identical conflict counts because they explore the same tree. Each FC conflict represents an entire subtree pruned early. BM always shows 0 conflicts: the bitmask guarantees every candidate is valid before it is tried.",
+    backtracks: "All four algorithms backtrack to find the same solution set. BM and FC arrive via shorter paths, but the backtrack count follows a similar shape. BT and HT are identical here — differences are smaller than in checks or conflicts.",
+    efficiency: "Check efficiency = placements ÷ checks × 100. BM approaches 100% at all N because every position it checks is guaranteed safe. BT and HT are lowest and equal — many checks end in rejection. FC is intermediate; domain filtering removes obvious conflicts but not all.",
+    conflictRate: "Conflict rate = conflicts ÷ checks × 100. BM is always 0%. BT and HT are equal (same tree). The gap between BT/HT and FC shows how much domain propagation reduces wasted checking. At N=8, BT/HT waste roughly 50–70% of checks on positions that will be rejected.",
+    candPerRow: "Average candidates per row = checks ÷ N. BT and HT always equal N (try every column). BM stays significantly below N because the mask pre-filters safe columns. FC is between the two. The gap widens as N grows.",
+    runtimeMs: "Wall-clock time in µs per run, averaged over multiple trials. BM is fastest at every N — all conflict detection is O(1) bit arithmetic. HT is typically second: same search tree as BT but O(1) hash-set checks instead of O(N) scans. BT comes next. Forward Checking is often slowest at small N despite fewer steps — each node copies the domain sets for all future rows (O(N²) per placement), and that per-node overhead outweighs the pruning savings when N is small. At N=7–8 the heavy branch pruning finally compensates.",
 };
 
 export function ChartsView() {
-    const METHODS: MethodKey[] = ["bt", "fc", "bm"];
+    const METHODS: MethodKey[] = ["bt", "ht", "fc", "bm"];
     const [focusedKey, setFocusedKey] = useState<string | null>(null);
 
     const allStats = useMemo(() =>
         CHART_NS.map(n => {
             const bt = countAlgoStatsFast(n, "bt");
+            const ht = countAlgoStatsFast(n, "ht");
             const fc = countAlgoStatsFast(n, "fc");
             const bm = countAlgoStatsFast(n, "bm");
             bt.runtimeMs = measureAlgoRuntime(n, "bt");
+            ht.runtimeMs = measureAlgoRuntime(n, "ht");
             fc.runtimeMs = measureAlgoRuntime(n, "fc");
             bm.runtimeMs = measureAlgoRuntime(n, "bm");
-            return { n, stats: { bt, fc, bm } as Record<MethodKey, AlgoStats> };
+            return { n, stats: { bt, ht, fc, bm } as Record<MethodKey, AlgoStats> };
         })
     , []);
 
     const makeData = (key: keyof AlgoStats) =>
         allStats.map(({ n, stats }) => ({
             label: `N=${n}`,
-            values: { bt: stats.bt[key], fc: stats.fc[key], bm: stats.bm[key] } as Record<MethodKey, number>,
+            values: { bt: stats.bt[key], ht: stats.ht[key], fc: stats.fc[key], bm: stats.bm[key] } as Record<MethodKey, number>,
         }));
 
     // Derived: check efficiency % = placements / checks × 100
@@ -260,6 +296,7 @@ export function ChartsView() {
             label: `N=${n}`,
             values: {
                 bt: pct(stats.bt.placements, stats.bt.checks),
+                ht: pct(stats.ht.placements, stats.ht.checks),
                 fc: pct(stats.fc.placements, stats.fc.checks),
                 bm: pct(stats.bm.placements, stats.bm.checks),
             } as Record<MethodKey, number>,
@@ -271,6 +308,7 @@ export function ChartsView() {
             label: `N=${n}`,
             values: {
                 bt: pct(stats.bt.conflicts, stats.bt.checks),
+                ht: pct(stats.ht.conflicts, stats.ht.checks),
                 fc: pct(stats.fc.conflicts, stats.fc.checks),
                 bm: 0,
             } as Record<MethodKey, number>,
@@ -282,6 +320,7 @@ export function ChartsView() {
             label: `N=${n}`,
             values: {
                 bt: Math.round(stats.bt.checks / n),
+                ht: Math.round(stats.ht.checks / n),
                 fc: Math.round(stats.fc.checks / n),
                 bm: Math.round(stats.bm.checks / n),
             } as Record<MethodKey, number>,
@@ -290,7 +329,7 @@ export function ChartsView() {
     const makeRuntimeData = () =>
         allStats.map(({ n, stats }) => ({
             label: `N=${n}`,
-            values: { bt: stats.bt.runtimeMs, fc: stats.fc.runtimeMs, bm: stats.bm.runtimeMs } as Record<MethodKey, number>,
+            values: { bt: stats.bt.runtimeMs, ht: stats.ht.runtimeMs, fc: stats.fc.runtimeMs, bm: stats.bm.runtimeMs } as Record<MethodKey, number>,
         }));
 
     type ChartEntry = {
