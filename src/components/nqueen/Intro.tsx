@@ -38,7 +38,7 @@ const MODE_OVERVIEW: { key: string; label: string; emoji: string; desc: string }
     { key: "single",  label: "Single",  emoji: "▶",  desc: "Step through one algorithm frame by frame. Use the scrubber, playback buttons, and decision log to trace every move." },
     { key: "compare", label: "Compare", emoji: "⇆",  desc: "Race any two algorithms side-by-side at the same step pace. See which finishes first and why." },
     { key: "charts",  label: "Charts",  emoji: "▦",  desc: "Bar charts of steps, runtime (µs), efficiency, and conflict rate for all three algorithms across N = 4–8." },
-    { key: "about",   label: "About",   emoji: "≡",  desc: "Plain-English explanations of each algorithm — expand any card for a comparison summary." },
+    { key: "about",   label: "Algorithms", emoji: "≡",  desc: "Plain-English explanations of each algorithm with time complexity charts — expand any card to explore." },
     { key: "faq",     label: "FAQ",     emoji: "?",  desc: "Answers to common questions about the problem, the algorithms, and how to read the metrics." },
 ];
 
@@ -50,9 +50,10 @@ const ALGO_PILLS: { key: MethodKey; tag: string }[] = [
 
 interface IntroViewProps {
     onStart: () => void;
+    onNavigate: (mode: string) => void;
 }
 
-export function IntroView({ onStart }: IntroViewProps) {
+export function IntroView({ onStart, onNavigate }: IntroViewProps) {
     return (
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             {/* Hero */}
@@ -66,7 +67,7 @@ export function IntroView({ onStart }: IntroViewProps) {
                 gap: 28,
                 alignItems: "center",
             }}>
-                <div>
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center" }}>
                     <h1 style={{
                         margin: "0 0 8px",
                         fontSize: 28, fontWeight: 700, letterSpacing: "-0.5px",
@@ -75,7 +76,7 @@ export function IntroView({ onStart }: IntroViewProps) {
                         N-Queens Visualizer
                     </h1>
                     <p style={{
-                        margin: "0 0 16px",
+                        margin: "0 auto 16px",
                         fontSize: 14, lineHeight: 1.65,
                         color: "var(--color-text-secondary)",
                         maxWidth: 520,
@@ -85,7 +86,7 @@ export function IntroView({ onStart }: IntroViewProps) {
                     </p>
 
                     {/* Algorithm pills */}
-                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 20 }}>
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 20, justifyContent: "center" }}>
                         {ALGO_PILLS.map(({ key, tag }) => {
                             const meta = METHOD_META[key];
                             return (
@@ -154,11 +155,21 @@ export function IntroView({ onStart }: IntroViewProps) {
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 10 }}>
                     {MODE_OVERVIEW.map(({ key, label, emoji, desc }) => (
-                        <div key={key} style={{
+                        <div key={key} onClick={() => onNavigate(key)} style={{
                             padding: "12px 14px",
                             background: "var(--color-background-secondary)",
                             border: "0.5px solid var(--color-border-tertiary)",
                             borderRadius: "var(--border-radius-md)",
+                            cursor: "pointer",
+                            transition: "border-color 0.15s, background 0.15s",
+                        }}
+                        onMouseEnter={e => {
+                            (e.currentTarget as HTMLDivElement).style.borderColor = "var(--color-border-info)";
+                            (e.currentTarget as HTMLDivElement).style.background = "var(--color-background-info)";
+                        }}
+                        onMouseLeave={e => {
+                            (e.currentTarget as HTMLDivElement).style.borderColor = "var(--color-border-tertiary)";
+                            (e.currentTarget as HTMLDivElement).style.background = "var(--color-background-secondary)";
                         }}>
                             <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 6 }}>
                                 <span style={{

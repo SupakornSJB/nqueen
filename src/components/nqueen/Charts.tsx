@@ -13,11 +13,12 @@ interface AlgoStats {
     placements: number;
     conflicts: number;
     backtracks: number;
+    avgDepth: number;
     runtimeMs: number;
 }
 
 function countAlgoStatsFast(n: number, method: MethodKey): AlgoStats {
-    let totalSteps = 0, checks = 0, placements = 0, conflicts = 0, backtracks = 0;
+    let totalSteps = 0, checks = 0, placements = 0, conflicts = 0, backtracks = 0, depthSum = 0;
 
     if (method === "bt") {
         const board = Array<number>(n).fill(-1);
@@ -28,27 +29,27 @@ function countAlgoStatsFast(n: number, method: MethodKey): AlgoStats {
             return true;
         };
         const solve = (row: number): void => {
-            if (row === n) { totalSteps++; return; }
-            totalSteps++;
+            if (row === n) { totalSteps++; depthSum += row; return; }
+            totalSteps++; depthSum += row;
             for (let col = 0; col < n; col++) {
-                checks++; totalSteps++;
+                checks++; totalSteps++; depthSum += row;
                 if (isSafe(row, col)) {
-                    placements++; totalSteps++;
+                    placements++; totalSteps++; depthSum += row;
                     board[row] = col; solve(row + 1); board[row] = -1;
-                    backtracks++; totalSteps++;
-                } else { conflicts++; totalSteps++; }
+                    backtracks++; totalSteps++; depthSum += row;
+                } else { conflicts++; totalSteps++; depthSum += row; }
             }
-            totalSteps++;
+            totalSteps++; depthSum += row;
         };
         solve(0);
     } else if (method === "fc") {
         const board = Array<number>(n).fill(-1);
         const solve = (row: number, domains: Set<number>[]): void => {
-            if (row === n) { totalSteps++; return; }
+            if (row === n) { totalSteps++; depthSum += row; return; }
             const validCols = Array.from(domains[row]).sort((a, b) => a - b);
-            totalSteps++;
+            totalSteps++; depthSum += row;
             for (const col of validCols) {
-                checks++; totalSteps++;
+                checks++; totalSteps++; depthSum += row;
                 const nd = domains.map(s => new Set(s));
                 let ok = true;
                 for (let r = row + 1; r < n; r++) {
@@ -57,12 +58,12 @@ function countAlgoStatsFast(n: number, method: MethodKey): AlgoStats {
                     if (nd[r].size === 0) { ok = false; break; }
                 }
                 if (ok) {
-                    placements++; totalSteps++;
+                    placements++; totalSteps++; depthSum += row;
                     board[row] = col; solve(row + 1, nd); board[row] = -1;
-                    backtracks++; totalSteps++;
-                } else { conflicts++; totalSteps++; }
+                    backtracks++; totalSteps++; depthSum += row;
+                } else { conflicts++; totalSteps++; depthSum += row; }
             }
-            totalSteps++;
+            totalSteps++; depthSum += row;
         };
         const init = Array.from({ length: n }, () => new Set(Array.from({ length: n }, (_, i) => i)));
         solve(0, init);
@@ -70,28 +71,28 @@ function countAlgoStatsFast(n: number, method: MethodKey): AlgoStats {
         const board = Array<number>(n).fill(-1);
         const full = (1 << n) - 1;
         const solve = (row: number, cols: number, d1: number, d2: number): void => {
-            if (row === n) { totalSteps++; return; }
+            if (row === n) { totalSteps++; depthSum += row; return; }
             const avail = full & ~(cols | d1 | d2);
-            totalSteps++;
-            if (avail === 0) { totalSteps++; return; }
+            totalSteps++; depthSum += row;
+            if (avail === 0) { totalSteps++; depthSum += row; return; }
             let mask = avail;
             while (mask) {
                 const bit = mask & (-mask);
                 const col = 31 - Math.clz32(bit);
                 mask &= mask - 1;
-                checks++; totalSteps++;
-                placements++; totalSteps++;
+                checks++; totalSteps++; depthSum += row;
+                placements++; totalSteps++; depthSum += row;
                 board[row] = col;
                 solve(row + 1, cols | bit, (d1 | bit) << 1, (d2 | bit) >> 1);
                 board[row] = -1;
-                backtracks++; totalSteps++;
+                backtracks++; totalSteps++; depthSum += row;
             }
-            totalSteps++;
+            totalSteps++; depthSum += row;
         };
         solve(0, 0, 0, 0);
     }
 
-    return { totalSteps, checks, placements, conflicts, backtracks, runtimeMs: 0 };
+    return { totalSteps, checks, placements, conflicts, backtracks, avgDepth: totalSteps > 0 ? depthSum / totalSteps : 0, runtimeMs: 0 };
 }
 
 function measureAlgoRuntime(n: number, method: MethodKey): number {
@@ -436,7 +437,7 @@ export function ChartsView() {
                 <table style={{ width: "100%", borderCollapse: "collapse" }}>
                     <thead>
                         <tr>
-                            {["N", "Algorithm", "Steps", "Checks", "Conflicts", "Backtracks", "Placed", "Efficiency", "Conflict %", "Cands/row", "Runtime (µs)"].map(h => (
+                            {["N", "Algorithm", "Steps", "Checks", "Conflicts", "Backtracks", "Placed", "Efficiency", "Conflict %", "Cands/row", "Avg depth", "Runtime (µs)"].map(h => (
                                 <th key={h} style={TH}>{h}</th>
                             ))}
                         </tr>
@@ -467,6 +468,7 @@ export function ChartsView() {
                                             {conf}%
                                         </td>
                                         <td style={TD}>{cpr}</td>
+                                        <td style={TD}>{s.avgDepth.toFixed(2)}</td>
                                         <td style={{ ...TD, color: "var(--color-text-info)" }}>{fmtUs(s.runtimeMs)} µs</td>
                                     </tr>
                                 );

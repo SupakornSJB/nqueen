@@ -5,7 +5,7 @@ import { TYPE_META, CELL, METHOD_META, SPEED_MS } from "../../lib/constants";
 import { buildMethodSteps, getAllSolutions } from "../../lib/algorithms";
 import { Board } from "./Board";
 import { SolutionsGallery } from "./SolutionsGallery";
-import { CallStack, DecisionLog, DecisionTree } from "./DecisionPanels";
+import { CallStack, DecisionLog, DecisionTree, RecursionDepthChart } from "./DecisionPanels";
 import { StatsBar } from "./StatsBar";
 import { CompareView } from "./CompareView";
 import { ChartsView } from "./Charts";
@@ -17,10 +17,10 @@ type AppMode = "home" | "single" | "compare" | "charts" | "about" | "faq";
 
 const MODES: { key: AppMode; label: string }[] = [
     { key: "home",    label: "Home" },
+    { key: "about",   label: "Algorithms" },
     { key: "single",  label: "Single" },
     { key: "compare", label: "Compare" },
     { key: "charts",  label: "Charts" },
-    { key: "about",   label: "About" },
     { key: "faq",     label: "FAQ" },
 ];
 
@@ -97,8 +97,8 @@ export default function NQueensVisualizer() {
         </div>
     );
 
-    const tabs: TabKey[] = ["log", "stack", "tree"];
-    const tabLabels: Record<TabKey, string> = { log: "Decision log", stack: "Call stack", tree: "Tree view" };
+    const tabs: TabKey[] = ["log", "stack", "tree", "depth"];
+    const tabLabels: Record<TabKey, string> = { log: "Decision log", stack: "Call stack", tree: "Tree view", depth: "Depth chart" };
 
     const btnBase: CSSProperties = {
         padding: "6px 12px", fontSize: 12,
@@ -150,107 +150,105 @@ export default function NQueensVisualizer() {
                 </div>
             </div>
 
-            {/* ── Playback controls — single and compare modes only ──────────── */}
+            {/* ── Shared controls: N and Speed ─────────────────────────────── */}
             {!hideControls && card(
-                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                    <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                            <span style={{ fontSize: 12, color: "var(--color-text-secondary)" }}>N =</span>
-                                {([4, 5, 6, 7, 8] as number[]).map(v => (
-                                    <button key={v} onClick={() => setN(v)} style={{
-                                        padding: "3px 10px", fontSize: 13,
-                                        borderRadius: "var(--border-radius-md)",
-                                        border: n === v ? "1.5px solid var(--color-border-info)" : "0.5px solid var(--color-border-secondary)",
-                                        background: n === v ? "var(--color-background-info)" : "transparent",
-                                        color: n === v ? "var(--color-text-info)" : "var(--color-text-secondary)",
-                                        cursor: "pointer", fontWeight: n === v ? 700 : 400,
-                                        boxShadow: n === v ? "0 0 0 2px var(--color-border-info)" : "none",
-                                        transform: n === v ? "scale(1.08)" : "scale(1)",
-                                        transition: "all 0.1s",
-                                    }}>
-                                        {v}
-                                    </button>
-                                ))}
-                            </div>
-                            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                                <span style={{ fontSize: 12, color: "var(--color-text-secondary)" }}>Speed</span>
-                                {(Object.keys(SPEED_MS) as SpeedKey[]).map(s => (
-                                    <button key={s} onClick={() => setSpeed(s)} style={{
-                                        padding: "3px 8px", fontSize: 11,
-                                        borderRadius: "var(--border-radius-md)",
-                                        border: speed === s ? "1.5px solid var(--color-border-info)" : "0.5px solid var(--color-border-secondary)",
-                                        background: speed === s ? "var(--color-background-info)" : "transparent",
-                                        color: speed === s ? "var(--color-text-info)" : "var(--color-text-secondary)",
-                                        cursor: "pointer", fontWeight: speed === s ? 700 : 400,
-                                        boxShadow: speed === s ? "0 0 0 2px var(--color-border-info)" : "none",
-                                        transform: speed === s ? "scale(1.08)" : "scale(1)",
-                                        transition: "all 0.1s",
-                                    }}>
-                                        {s === "vfast" ? "max" : s}
-                                    </button>
-                                ))}
-                            </div>
-                    </div>
-
-                    {mode === "single" && <>
-                        {/* Algorithm selector */}
-                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                            <span style={{ fontSize: 12, color: "var(--color-text-secondary)" }}>Algorithm</span>
-                            {(["bt", "fc", "bm"] as MethodKey[]).map(m => {
-                                const meta = METHOD_META[m];
-                                const isActive = method === m;
-                                return (
-                                    <button key={m} onClick={() => setMethod(m)} style={{
-                                        padding: "3px 10px", fontSize: 11,
-                                        borderRadius: "var(--border-radius-md)",
-                                        border: isActive ? `1.5px solid ${meta.accentBorder}` : "0.5px solid var(--color-border-secondary)",
-                                        background: isActive ? meta.accentBg : "transparent",
-                                        color: isActive ? meta.accent : "var(--color-text-secondary)",
-                                        cursor: "pointer", fontWeight: isActive ? 700 : 400,
-                                        boxShadow: isActive ? `0 0 0 2px ${meta.accentBorder}` : "none",
-                                        transform: isActive ? "scale(1.08)" : "scale(1)",
-                                        transition: "all 0.1s",
-                                    }}>
-                                        {meta.name}
-                                    </button>
-                                );
-                            })}
-                        </div>
-
-                        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                            <button onClick={togglePlay} style={{
-                                ...btnBase,
-                                border: "0.5px solid var(--color-border-info)",
-                                background: "var(--color-background-info)",
-                                color: "var(--color-text-info)", fontWeight: 500,
-                                padding: "6px 16px", fontSize: 13,
+                <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <span style={{ fontSize: 12, color: "var(--color-text-secondary)" }}>N =</span>
+                        {([4, 5, 6, 7, 8] as number[]).map(v => (
+                            <button key={v} onClick={() => setN(v)} style={{
+                                padding: "3px 10px", fontSize: 13,
+                                borderRadius: "var(--border-radius-md)",
+                                border: n === v ? "1.5px solid var(--color-border-info)" : "0.5px solid var(--color-border-secondary)",
+                                background: n === v ? "var(--color-background-info)" : "transparent",
+                                color: n === v ? "var(--color-text-info)" : "var(--color-text-secondary)",
+                                cursor: "pointer", fontWeight: n === v ? 700 : 400,
+                                boxShadow: n === v ? "0 0 0 2px var(--color-border-info)" : "none",
+                                transform: n === v ? "scale(1.08)" : "scale(1)",
+                                transition: "all 0.1s",
                             }}>
-                                {playing ? "⏸ Pause" : currentIdx >= steps.length - 1 ? "↺ Replay" : "▶ Play"}
+                                {v}
                             </button>
-                            <button onClick={() => setCurrentIdx(i => Math.max(0, i - 1))} disabled={currentIdx === 0} style={btnBase}>◀ Back</button>
-                            <button onClick={advance} disabled={currentIdx >= steps.length - 1} style={btnBase}>Step ▶</button>
-                            <button onClick={reset} style={btnBase}>↺ Reset</button>
-                        </div>
+                        ))}
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <span style={{ fontSize: 12, color: "var(--color-text-secondary)" }}>Speed</span>
+                        {(Object.keys(SPEED_MS) as SpeedKey[]).map(s => (
+                            <button key={s} onClick={() => setSpeed(s)} style={{
+                                padding: "3px 8px", fontSize: 11,
+                                borderRadius: "var(--border-radius-md)",
+                                border: speed === s ? "1.5px solid var(--color-border-info)" : "0.5px solid var(--color-border-secondary)",
+                                background: speed === s ? "var(--color-background-info)" : "transparent",
+                                color: speed === s ? "var(--color-text-info)" : "var(--color-text-secondary)",
+                                cursor: "pointer", fontWeight: speed === s ? 700 : 400,
+                                boxShadow: speed === s ? "0 0 0 2px var(--color-border-info)" : "none",
+                                transform: speed === s ? "scale(1.08)" : "scale(1)",
+                                transition: "all 0.1s",
+                            }}>
+                                {s === "vfast" ? "max" : s}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            )}
 
-                        <div>
-                            <input
-                                type="range" min={0} max={steps.length - 1} value={currentIdx} step={1}
-                                onChange={e => { setCurrentIdx(Number(e.target.value)); setPlaying(false); }}
-                                style={{ width: "100%" }}
-                            />
-                            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "var(--color-text-tertiary)", marginTop: 2 }}>
-                                <span>step {currentIdx}</span>
-                                <span>{Math.round(progress)}%</span>
-                                <span>{steps.length - 1} total</span>
-                            </div>
+            {/* ── Single mode controls: Algorithm + Playback ────────────────── */}
+            {mode === "single" && card(
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <span style={{ fontSize: 12, color: "var(--color-text-secondary)", marginRight: 6 }}>Algorithm</span>
+                        {(["bt", "fc", "bm"] as MethodKey[]).map(m => {
+                            const meta = METHOD_META[m];
+                            const isActive = method === m;
+                            return (
+                                <button key={m} onClick={() => setMethod(m)} style={{
+                                    padding: "3px 10px", fontSize: 11,
+                                    borderRadius: "var(--border-radius-md)",
+                                    border: isActive ? `1.5px solid ${meta.accentBorder}` : "0.5px solid var(--color-border-secondary)",
+                                    background: isActive ? meta.accentBg : "transparent",
+                                    color: isActive ? meta.accent : "var(--color-text-secondary)",
+                                    cursor: "pointer", fontWeight: isActive ? 700 : 400,
+                                    boxShadow: isActive ? `0 0 0 2px ${meta.accentBorder}` : "none",
+                                    transform: isActive ? "scale(1.08)" : "scale(1)",
+                                    transition: "all 0.1s",
+                                }}>
+                                    {meta.name}
+                                </button>
+                            );
+                        })}
+                    </div>
+                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                        <button onClick={togglePlay} style={{
+                            ...btnBase,
+                            border: "0.5px solid var(--color-border-info)",
+                            background: "var(--color-background-info)",
+                            color: "var(--color-text-info)", fontWeight: 500,
+                            padding: "6px 16px", fontSize: 13,
+                        }}>
+                            {playing ? "⏸ Pause" : currentIdx >= steps.length - 1 ? "↺ Replay" : "▶ Play"}
+                        </button>
+                        <button onClick={() => setCurrentIdx(i => Math.max(0, i - 1))} disabled={currentIdx === 0} style={btnBase}>◀ Back</button>
+                        <button onClick={advance} disabled={currentIdx >= steps.length - 1} style={btnBase}>Step ▶</button>
+                        <button onClick={reset} style={btnBase}>↺ Reset</button>
+                    </div>
+                    <div>
+                        <input
+                            type="range" min={0} max={steps.length - 1} value={currentIdx} step={1}
+                            onChange={e => { setCurrentIdx(Number(e.target.value)); setPlaying(false); }}
+                            style={{ width: "100%" }}
+                        />
+                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "var(--color-text-tertiary)", marginTop: 2 }}>
+                            <span>step {currentIdx}</span>
+                            <span>{Math.round(progress)}%</span>
+                            <span>{steps.length - 1} total</span>
                         </div>
-                    </>}
+                    </div>
                 </div>
             )}
 
             {/* ── Compare mode ─────────────────────────────────────────────── */}
             {/* ── Home / intro mode ────────────────────────────────────────── */}
-            {mode === "home" && <IntroView onStart={() => setMode("single")} />}
+            {mode === "home" && <IntroView onStart={() => setMode("single")} onNavigate={(m) => setMode(m as AppMode)} />}
 
             {/* ── Compare mode ─────────────────────────────────────────────── */}
             {mode === "compare" && <CompareView n={n} speed={speed} />}
@@ -326,6 +324,9 @@ export default function NQueensVisualizer() {
                                     )}
                                     {activeTab === "tree" && (
                                         <>{sectionLabel("Search space explored so far")}<DecisionTree steps={steps} currentIdx={currentIdx} n={n} /></>
+                                    )}
+                                    {activeTab === "depth" && (
+                                        <>{sectionLabel("Recursion depth at each step")}<RecursionDepthChart steps={steps} currentIdx={currentIdx} /></>
                                     )}
                                 </div>
                                 , { flex: 1 })}

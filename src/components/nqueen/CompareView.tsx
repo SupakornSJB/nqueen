@@ -100,7 +100,7 @@ export function MethodSide({ method, steps, idx, n }: MethodSideProps) {
 
             {/* Derived algorithm-specific metrics */}
             <div style={{
-                display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 4,
+                display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 4,
                 borderTop: "0.5px solid var(--color-border-tertiary)", paddingTop: 8,
             }}>
                 <div style={{
@@ -112,7 +112,7 @@ export function MethodSide({ method, steps, idx, n }: MethodSideProps) {
                     <div style={{ fontSize: 14, fontWeight: 600, color: efficiency >= 80 ? "var(--color-text-success)" : "var(--color-text-primary)" }}>
                         {efficiency}%
                     </div>
-                    <div style={{ fontSize: 9, color: "var(--color-text-secondary)", marginTop: 1 }}>Check efficiency</div>
+                    <div style={{ fontSize: 9, color: "var(--color-text-secondary)", marginTop: 1 }}>Check eff.</div>
                 </div>
                 <div style={{
                     textAlign: "center", padding: "5px 2px",
@@ -135,6 +135,17 @@ export function MethodSide({ method, steps, idx, n }: MethodSideProps) {
                         {candPerRow}
                     </div>
                     <div style={{ fontSize: 9, color: "var(--color-text-secondary)", marginTop: 1 }}>Cands / row</div>
+                </div>
+                <div style={{
+                    textAlign: "center", padding: "5px 2px",
+                    background: "var(--color-background-secondary)",
+                    border: "0.5px solid var(--color-border-tertiary)",
+                    borderRadius: "var(--border-radius-md)",
+                }}>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: "var(--color-text-primary)" }}>
+                        {stats.avgDepth.toFixed(1)}
+                    </div>
+                    <div style={{ fontSize: 9, color: "var(--color-text-secondary)", marginTop: 1 }}>Avg depth</div>
                 </div>
             </div>
         </div>
@@ -173,13 +184,14 @@ export function ComparisonBar({ stepsA, stepsB, idxA, idxB, methodA, methodB, n 
 
     type MetricRow = { label: string; a: number | string; b: number | string; aWins: boolean; bWins: boolean };
     const metrics: MetricRow[] = [
-        { label: "Total steps",      a: totalA,               b: totalB,               aWins: totalA < totalB,  bWins: totalB < totalA },
-        { label: "Checks",           a: aFinalStats.checks,   b: bFinalStats.checks,   aWins: aFinalStats.checks < bFinalStats.checks, bWins: bFinalStats.checks < aFinalStats.checks },
-        { label: "Conflicts",        a: aFinalStats.conflicts, b: bFinalStats.conflicts, aWins: aFinalStats.conflicts < bFinalStats.conflicts, bWins: bFinalStats.conflicts < aFinalStats.conflicts },
-        { label: "Backtracks",       a: aFinalStats.backtracks, b: bFinalStats.backtracks, aWins: aFinalStats.backtracks < bFinalStats.backtracks, bWins: bFinalStats.backtracks < aFinalStats.backtracks },
-        { label: "Check efficiency", a: `${aEff}%`,           b: `${bEff}%`,           aWins: aEff > bEff,      bWins: bEff > aEff },
-        { label: "Conflict rate",    a: `${aConf}%`,          b: `${bConf}%`,          aWins: aConf < bConf,    bWins: bConf < aConf },
-        { label: "Cands / row",      a: aCpr,                 b: bCpr,                 aWins: aCpr < bCpr,      bWins: bCpr < aCpr },
+        { label: "Total steps",      a: totalA,                          b: totalB,                          aWins: totalA < totalB,                              bWins: totalB < totalA },
+        { label: "Checks",           a: aFinalStats.checks,              b: bFinalStats.checks,              aWins: aFinalStats.checks < bFinalStats.checks,      bWins: bFinalStats.checks < aFinalStats.checks },
+        { label: "Conflicts",        a: aFinalStats.conflicts,           b: bFinalStats.conflicts,           aWins: aFinalStats.conflicts < bFinalStats.conflicts, bWins: bFinalStats.conflicts < aFinalStats.conflicts },
+        { label: "Backtracks",       a: aFinalStats.backtracks,          b: bFinalStats.backtracks,          aWins: aFinalStats.backtracks < bFinalStats.backtracks, bWins: bFinalStats.backtracks < aFinalStats.backtracks },
+        { label: "Check efficiency", a: `${aEff}%`,                      b: `${bEff}%`,                      aWins: aEff > bEff,                                  bWins: bEff > aEff },
+        { label: "Conflict rate",    a: `${aConf}%`,                     b: `${bConf}%`,                     aWins: aConf < bConf,                                bWins: bConf < aConf },
+        { label: "Cands / row",      a: aCpr,                            b: bCpr,                            aWins: aCpr < bCpr,                                  bWins: bCpr < aCpr },
+        { label: "Avg depth",        a: aFinalStats.avgDepth.toFixed(2), b: bFinalStats.avgDepth.toFixed(2), aWins: aFinalStats.avgDepth < bFinalStats.avgDepth,  bWins: bFinalStats.avgDepth < aFinalStats.avgDepth },
     ];
 
     const winnerMeta = totalA <= totalB ? metaA : metaB;

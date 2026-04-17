@@ -2,6 +2,110 @@ import { useEffect, useRef } from "react";
 import type { Step, VisitedState, NodeColor } from "../../lib/types";
 import { TYPE_META } from "../../lib/constants";
 
+// ─── Recursion Depth Chart ────────────────────────────────────────────────────
+
+export function RecursionDepthChart({ steps, currentIdx }: { steps: Step[]; currentIdx: number }) {
+    const W = 600, H = 150;
+    const PAD = { top: 12, bottom: 24, left: 28, right: 8 };
+    const cW = W - PAD.left - PAD.right;
+    const cH = H - PAD.top - PAD.bottom;
+
+    const total = steps.length;
+    const maxDepth = steps.reduce((m, s) => Math.max(m, s.stackDepth), 0);
+
+    // Prefix sums for O(1) moving average queries
+    const prefix = new Array(total + 1).fill(0);
+    for (let i = 0; i < total; i++) prefix[i + 1] = prefix[i] + steps[i].stackDepth;
+    const rangeAvg = (from: number, to: number) => (prefix[to + 1] - prefix[from]) / (to - from + 1);
+
+    const maWindow = Math.max(5, Math.floor(total / 40));
+
+    // Downsample to ≤600 points for rendering performance
+    const stride = Math.max(1, Math.floor(total / 600));
+    const rawPts: string[] = [];
+    const maPts: string[] = [];
+    for (let i = 0; i < total; i += stride) {
+        const x = PAD.left + (i / Math.max(1, total - 1)) * cW;
+        rawPts.push(`${x.toFixed(1)},${(PAD.top + cH - (steps[i].stackDepth / Math.max(1, maxDepth)) * cH).toFixed(1)}`);
+        const from = Math.max(0, i - Math.floor(maWindow / 2));
+        const to = Math.min(total - 1, i + Math.ceil(maWindow / 2));
+        maPts.push(`${x.toFixed(1)},${(PAD.top + cH - (rangeAvg(from, to) / Math.max(1, maxDepth)) * cH).toFixed(1)}`);
+    }
+    // Always include last point
+    if (total > 1 && (total - 1) % stride !== 0) {
+        const x = PAD.left + cW;
+        rawPts.push(`${x.toFixed(1)},${(PAD.top + cH - (steps[total - 1].stackDepth / Math.max(1, maxDepth)) * cH).toFixed(1)}`);
+        const avg = rangeAvg(Math.max(0, total - 1 - Math.floor(maWindow / 2)), total - 1);
+        maPts.push(`${x.toFixed(1)},${(PAD.top + cH - (avg / Math.max(1, maxDepth)) * cH).toFixed(1)}`);
+    }
+
+    const curX = PAD.left + (currentIdx / Math.max(1, total - 1)) * cW;
+    const curDepth = steps[currentIdx]?.stackDepth ?? 0;
+    const curY = PAD.top + cH - (curDepth / Math.max(1, maxDepth)) * cH;
+    const overallAvg = total > 0 ? prefix[total] / total : 0;
+
+    const yTicks = maxDepth <= 2 ? [0, maxDepth] : [0, Math.floor(maxDepth / 2), maxDepth];
+    const lastRawX = rawPts.length > 0 ? parseFloat(rawPts[rawPts.length - 1].split(",")[0]) : PAD.left + cW;
+
+    return (
+        <div>
+            <div style={{ display: "flex", gap: 14, marginBottom: 6, fontSize: 10, color: "var(--color-text-tertiary)" }}>
+                <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                    <svg width="18" height="4"><line x1="0" y1="2" x2="18" y2="2" stroke="var(--color-text-info)" strokeWidth="1.2" opacity="0.55" /></svg>
+                    Raw depth
+                </span>
+                <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                    <svg width="18" height="4"><line x1="0" y1="2" x2="18" y2="2" stroke="var(--color-text-warning)" strokeWidth="1.8" /></svg>
+                    Moving avg
+                </span>
+            </div>
+            <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ display: "block" }}>
+                {yTicks.map(d => {
+                    const y = PAD.top + cH - (d / Math.max(1, maxDepth)) * cH;
+                    return (
+                        <g key={d}>
+                            <line x1={PAD.left} y1={y} x2={PAD.left + cW} y2={y}
+                                stroke="var(--color-border-tertiary)" strokeWidth={0.5} />
+                            <text x={PAD.left - 4} y={y + 3.5} textAnchor="end" fontSize={8}
+                                fill="var(--color-text-tertiary)" fontFamily="var(--font-mono)">{d}</text>
+                        </g>
+                    );
+                })}
+                {/* Filled area under raw line */}
+                {rawPts.length > 0 && (
+                    <polygon
+                        points={[`${PAD.left},${PAD.top + cH}`, ...rawPts, `${lastRawX},${PAD.top + cH}`].join(" ")}
+                        fill="var(--color-background-info)" opacity={0.15}
+                    />
+                )}
+                {/* Raw depth */}
+                <polyline points={rawPts.join(" ")} fill="none"
+                    stroke="var(--color-text-info)" strokeWidth={1} opacity={0.55} />
+                {/* Moving average */}
+                <polyline points={maPts.join(" ")} fill="none"
+                    stroke="var(--color-text-warning)" strokeWidth={1.8} opacity={0.9} />
+                {/* Current position marker */}
+                <line x1={curX} y1={PAD.top} x2={curX} y2={PAD.top + cH}
+                    stroke="var(--color-text-primary)" strokeWidth={1} strokeDasharray="3,2" opacity={0.5} />
+                <circle cx={curX} cy={curY} r={3.5} fill="var(--color-text-primary)" />
+                {/* Axes */}
+                <line x1={PAD.left} y1={PAD.top} x2={PAD.left} y2={PAD.top + cH}
+                    stroke="var(--color-border-secondary)" strokeWidth={0.5} />
+                <line x1={PAD.left} y1={PAD.top + cH} x2={PAD.left + cW} y2={PAD.top + cH}
+                    stroke="var(--color-border-secondary)" strokeWidth={0.5} />
+                <text x={PAD.left} y={H - 5} textAnchor="start" fontSize={7.5}
+                    fill="var(--color-text-tertiary)" fontFamily="var(--font-sans)">step 0</text>
+                <text x={PAD.left + cW} y={H - 5} textAnchor="end" fontSize={7.5}
+                    fill="var(--color-text-tertiary)" fontFamily="var(--font-sans)">step {total - 1}</text>
+            </svg>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "var(--color-text-tertiary)", marginTop: 3 }}>
+                <span>Current depth: <strong style={{ color: "var(--color-text-primary)", fontFamily: "var(--font-mono)" }}>{curDepth}</strong></span>
+                <span>Avg depth: <strong style={{ color: "var(--color-text-primary)", fontFamily: "var(--font-mono)" }}>{overallAvg.toFixed(2)}</strong></span>
+            </div>
+        </div>
+    );
+}
+
 // ─── Call Stack ───────────────────────────────────────────────────────────────
 
 export function CallStack({ step, n }: { step: Step | undefined; n: number }) {

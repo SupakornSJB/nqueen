@@ -136,6 +136,71 @@ export function buildStepsBM(n: number): Step[] {
     return steps;
 }
 
+// ─── Fast step counter (no Step allocation — safe for large N / workers) ──────
+
+export function countStepsTotal(method: MethodKey, n: number): number {
+    let c = 0;
+    if (method === "bt") {
+        const board = Array<number>(n).fill(-1);
+        const isSafe = (row: number, col: number) => {
+            for (let r = 0; r < row; r++) {
+                if (board[r] === col || Math.abs(board[r] - col) === Math.abs(r - row)) return false;
+            }
+            return true;
+        };
+        const solve = (row: number): void => {
+            if (row === n) { c++; return; }
+            c++;
+            for (let col = 0; col < n; col++) {
+                c++;
+                if (isSafe(row, col)) { c++; board[row] = col; solve(row + 1); board[row] = -1; c++; }
+                else c++;
+            }
+            c++;
+        };
+        solve(0);
+    } else if (method === "fc") {
+        const board = Array<number>(n).fill(-1);
+        const solve = (row: number, domains: Set<number>[]): void => {
+            if (row === n) { c++; return; }
+            const vc = Array.from(domains[row]).sort((a, b) => a - b);
+            c++;
+            for (const col of vc) {
+                c++;
+                const nd = domains.map(s => new Set(s));
+                let ok = true;
+                for (let r = row + 1; r < n; r++) {
+                    const d = r - row;
+                    nd[r].delete(col); nd[r].delete(col - d); nd[r].delete(col + d);
+                    if (nd[r].size === 0) { ok = false; break; }
+                }
+                if (ok) { c++; board[row] = col; solve(row + 1, nd); board[row] = -1; c++; }
+                else c++;
+            }
+            c++;
+        };
+        solve(0, Array.from({ length: n }, () => new Set(Array.from({ length: n }, (_, i) => i))));
+    } else {
+        const full = (1 << n) - 1;
+        const solve = (row: number, cols: number, d1: number, d2: number): void => {
+            if (row === n) { c++; return; }
+            const avail = full & ~(cols | d1 | d2);
+            c++;
+            if (avail === 0) { c++; return; }
+            let mask = avail;
+            while (mask) {
+                const bit = mask & (-mask); mask &= mask - 1;
+                c += 2;
+                solve(row + 1, cols | bit, (d1 | bit) << 1, (d2 | bit) >> 1);
+                c++;
+            }
+            c++;
+        };
+        solve(0, 0, 0, 0);
+    }
+    return c;
+}
+
 // ─── Shared helpers ───────────────────────────────────────────────────────────
 
 export function buildMethodSteps(method: MethodKey, n: number): Step[] {
@@ -181,13 +246,15 @@ export function getCellState(step: Step | undefined, row: number, col: number): 
 }
 
 export function countStepStats(steps: Step[], upTo: number) {
-    let checks = 0, placements = 0, conflicts = 0, backtracks = 0;
+    let checks = 0, placements = 0, conflicts = 0, backtracks = 0, depthSum = 0;
     for (let i = 0; i <= upTo; i++) {
-        const t = steps[i].type;
-        if (t === "check") checks++;
-        if (t === "place") placements++;
-        if (t === "conflict") conflicts++;
-        if (t === "backtrack" || t === "exhaust") backtracks++;
+        const { type, stackDepth } = steps[i];
+        if (type === "check") checks++;
+        if (type === "place") placements++;
+        if (type === "conflict") conflicts++;
+        if (type === "backtrack" || type === "exhaust") backtracks++;
+        depthSum += stackDepth;
     }
-    return { checks, placements, conflicts, backtracks };
+    const avgDepth = upTo >= 0 ? depthSum / (upTo + 1) : 0;
+    return { checks, placements, conflicts, backtracks, avgDepth };
 }
