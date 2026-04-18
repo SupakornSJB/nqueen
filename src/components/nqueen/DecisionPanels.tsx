@@ -187,7 +187,7 @@ export function DecisionLog({ steps, currentIdx }: { steps: Step[]; currentIdx: 
                         marginBottom: isCurrent ? 4 : 0,
                         opacity: isCurrent ? 1 : Math.max(0.3, 0.9 - i * 0.04),
                     }}>
-                        <div style={{ width: 7, height: 7, borderRadius: "50%", background: meta.dot, flexShrink: 0, marginTop: 5 }} />
+                        <div style={{ width: 7, height: 7, borderRadius: "50%", background: meta.dot, flexShrink: 0, alignSelf: "center" }} />
                         <div style={{ flex: 1 }}>
                             <div style={{ fontSize: 12, color: isCurrent ? meta.tagText : "var(--color-text-primary)", display: "flex", alignItems: "center", gap: 5, flexWrap: "wrap", fontWeight: isCurrent ? 500 : 400 }}>
                                 <span>{s.reason}</span>

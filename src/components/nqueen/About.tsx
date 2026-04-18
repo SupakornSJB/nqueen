@@ -46,12 +46,19 @@ const DESCRIPTIONS: Record<MethodKey, AlgoDesc> = {
     },
 };
 
-// Per-method N ranges.  BM is pure bit-ops so it stays fast at higher N.
 const NS_FOR_METHOD: Record<MethodKey, number[]> = {
     bt: [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14],
     ht: [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14],
     fc: [4, 5, 6, 7, 8, 9, 10, 11, 12, 13],
     bm: [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
+};
+
+// Extended ranges — BT/HT capped at 16; FC at 18; BM capped at 17 (N≥18 is impractically slow).
+const NS_FOR_METHOD_EXTENDED: Record<MethodKey, number[]> = {
+    bt: [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16],
+    ht: [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16],
+    fc: [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18],
+    bm: [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17],
 };
 
 // ─── Spinner ──────────────────────────────────────────────────────────────────
@@ -70,20 +77,41 @@ function Spinner({ color }: { color: string }) {
 
 // ─── Complexity chart ─────────────────────────────────────────────────────────
 
-type HoverInfo = { n: number; us: number; runIdx: number; totalRuns: number; svgX: number; svgY: number };
+type HoverInfo = { n: number; us: number; runIdx: number; totalRuns: number; svgX: number; svgY: number; isMedian?: boolean };
 
-function ComplexityChart({ method }: { method: MethodKey }) {
+function ComplexityChart({ method, extended }: { method: MethodKey; extended: boolean }) {
     const meta     = METHOD_META[method];
-    const data     = useComplexityStore(s => s.results[method]);
-    const progress = useComplexityStore(s => s.progress[method]);
+    const normalData = useComplexityStore(s => s.results[method]);
+    const extData    = useComplexityStore(s => s.resultsExtended[method]);
+    const progress = useComplexityStore(s => extended ? s.progressExtended[method] : s.progress[method]);
+    // In normal mode, fall back to extended data (filtered) — but not while actively recomputing.
+    const data = extended
+        ? extData
+        : (normalData ?? (!progress && extData ? extData.filter(p => NS_FOR_METHOD[method].includes(p.n)) : undefined));
     const [hovered, setHovered] = useState<HoverInfo | null>(null);
 
     // ── Loading state ──────────────────────────────────────────────────────────
     if (!data) {
-        const pct = progress ? Math.round(progress.done / progress.total * 100) : 0;
-        const label = progress
+        if (progress?.error) {
+            return (
+                <div style={{ padding: "24px 0", textAlign: "center" }}>
+                    <div style={{ fontSize: 12, color: "var(--color-text-danger)", marginBottom: 6 }}>
+                        Worker failed to start — check the browser console (F12) for details.
+                    </div>
+                    <div style={{ fontSize: 10, fontFamily: "var(--font-mono)",
+                        color: "var(--color-text-tertiary)" }}>
+                        {progress.error}
+                    </div>
+                </div>
+            );
+        }
+        const pct = (progress && progress.total > 0)
+            ? Math.round(progress.done / progress.total * 100) : 0;
+        const label = (progress && progress.done > 0)
             ? `N=${progress.currentN} done — ${pct}% (${progress.done}/${progress.total})`
-            : 'Starting worker…';
+            : (progress && progress.total > 0)
+            ? `Computing N=${progress.currentN}… (${progress.done + 1}/${progress.total})${progress.total === 1 ? ' — may take several minutes' : ''}`
+            : extended ? 'Starting extended worker…' : 'Starting worker…';
         return (
             <div style={{ display: "flex", flexDirection: "column", alignItems: "center",
                 justifyContent: "center", padding: "32px 0", gap: 12 }}>
@@ -191,7 +219,7 @@ function ComplexityChart({ method }: { method: MethodKey }) {
                     fill="var(--color-text-primary)" fontFamily="var(--font-mono)">{usStr}</text>
                 <text x={tx + TTIP_W / 2} y={ty + 43} textAnchor="middle" fontSize={8}
                     fill="var(--color-text-tertiary)" fontFamily="var(--font-sans)">
-                    run {h.runIdx + 1} / {h.totalRuns}
+                    {h.isMedian ? "median" : `run ${h.runIdx + 1} / ${h.totalRuns}`}
                 </text>
             </g>
         );
@@ -265,12 +293,21 @@ function ComplexityChart({ method }: { method: MethodKey }) {
                 <polyline points={regPts} fill="none"
                     stroke={meta.accent} strokeWidth={2.2} opacity={0.9} />
 
-                {/* Median dots */}
-                {medians.map(({ n, med }) => (
-                    <circle key={n} cx={xPosN(n)} cy={yPos(med / t4)} r={4}
-                        fill={meta.accent}
-                        stroke="var(--color-background-primary)" strokeWidth={1.5} />
-                ))}
+                {/* Median dots — rendered last so they sit on top and are always hoverable */}
+                {medians.map(({ n, med }) => {
+                    const cx = xPosN(n);
+                    const cy = yPos(med / t4);
+                    const isHov = hovered?.n === n && hovered.isMedian;
+                    return (
+                        <circle key={n} cx={cx} cy={cy} r={isHov ? 5.5 : 4}
+                            fill={meta.accent}
+                            stroke="var(--color-background-primary)" strokeWidth={1.5}
+                            style={{ cursor: "pointer", transition: "r 0.1s" }}
+                            onMouseEnter={() =>
+                                setHovered({ n, us: med, runIdx: -1, totalRuns: 0, svgX: cx, svgY: cy, isMedian: true })}
+                        />
+                    );
+                })}
 
                 {/* Axes */}
                 <line x1={PAD.left} y1={PAD.top} x2={PAD.left} y2={PAD.top + cH}
@@ -331,26 +368,277 @@ function ComplexityChart({ method }: { method: MethodKey }) {
 // ─── Algorithms view ──────────────────────────────────────────────────────────
 
 export function AboutView() {
-    const [expanded, setExpanded]   = useState<MethodKey | null>(null);
-    const startIfNeeded             = useComplexityStore(s => s.startIfNeeded);
-    const results                   = useComplexityStore(s => s.results);
-    const progressMap               = useComplexityStore(s => s.progress);
+    const [expanded, setExpanded]       = useState<MethodKey | null>(null);
+    const [extended, setExtended]       = useState(false);
+    const [showConfirm, setShowConfirm] = useState(false);
+    const [showInfo, setShowInfo]       = useState(false);
+    const [showRefreshConfirm, setShowRefreshConfirm] = useState(false);
+    const [refreshHovered, setRefreshHovered]         = useState(false);
+    const startIfNeeded               = useComplexityStore(s => s.startIfNeeded);
+    const startExtendedIfNeeded       = useComplexityStore(s => s.startExtendedIfNeeded);
+    const clearNormalCache            = useComplexityStore(s => s.clearNormalCache);
+    const clearExtCache               = useComplexityStore(s => s.clearExtCache);
+    const results                     = useComplexityStore(s => s.results);
+    const resultsExtended             = useComplexityStore(s => s.resultsExtended);
+    const progressMap                 = useComplexityStore(s => s.progress);
+    const progressExtMap              = useComplexityStore(s => s.progressExtended);
 
-    // Kick off all three workers as soon as this page is opened.
-    // Workers that are already running or done are silently skipped.
     useEffect(() => {
         (["bt", "ht", "fc", "bm"] as MethodKey[]).forEach(m => startIfNeeded(m, NS_FOR_METHOD[m]));
     }, [startIfNeeded]);
+
+
+    const handleToggle = () => {
+        if (!extended) {
+            const alreadyOngoing = (["bt", "ht", "fc", "bm"] as MethodKey[]).some(m => progressExtMap[m]);
+            const alreadyCached  = (["bt", "ht", "fc", "bm"] as MethodKey[]).some(m => resultsExtended[m]);
+            if (alreadyOngoing || alreadyCached) {
+                setExtended(true);
+                (["bt", "ht", "fc", "bm"] as MethodKey[]).forEach(m =>
+                    startExtendedIfNeeded(m, NS_FOR_METHOD_EXTENDED[m]));
+            } else {
+                setShowConfirm(true);
+            }
+        } else {
+            setExtended(false);
+        }
+    };
+
+    const confirmExtended = () => {
+        setShowConfirm(false);
+        setExtended(true);
+        (["bt", "ht", "fc", "bm"] as MethodKey[]).forEach(m =>
+            startExtendedIfNeeded(m, NS_FOR_METHOD_EXTENDED[m]));
+    };
 
     const methods: MethodKey[] = ["bt", "ht", "fc", "bm"];
 
     return (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {/* Extended range toggle */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 8 }}>
+                <span style={{ fontSize: 11, color: "var(--color-text-secondary)" }}>Normal</span>
+                <button
+                    onClick={handleToggle}
+                    role="switch"
+                    aria-checked={extended}
+                    style={{
+                        position: "relative", width: 36, height: 20, borderRadius: 10,
+                        cursor: "pointer", border: "none", padding: 0, flexShrink: 0,
+                        background: extended ? "var(--accent)" : "var(--color-border-secondary)",
+                        transition: "background 0.2s",
+                    }}
+                >
+                    <span style={{
+                        position: "absolute", top: 2, left: extended ? 18 : 2,
+                        width: 16, height: 16, borderRadius: "50%",
+                        background: "#fff", transition: "left 0.18s",
+                        boxShadow: "0 1px 3px rgba(0,0,0,0.3)", display: "block",
+                    }} />
+                </button>
+                <span style={{ fontSize: 11, color: "var(--color-text-secondary)" }}>Extended</span>
+
+                {/* Refresh button */}
+                <button
+                    onClick={() => setShowRefreshConfirm(true)}
+                    onMouseEnter={() => setRefreshHovered(true)}
+                    onMouseLeave={() => setRefreshHovered(false)}
+                    style={{
+                        fontSize: 10, padding: "2px 9px", borderRadius: 99, cursor: "pointer",
+                        border: `1px solid ${refreshHovered ? "var(--color-border-primary)" : "var(--color-border-secondary)"}`,
+                        background: refreshHovered ? "var(--color-background-primary)" : "var(--color-background-secondary)",
+                        color: refreshHovered ? "var(--color-text-secondary)" : "var(--color-text-tertiary)",
+                        flexShrink: 0, transition: "background 0.15s, border-color 0.15s, color 0.15s",
+                    }}
+                >
+                    ↺ Refresh {extended ? "extended" : "normal"}
+                </button>
+
+                {/* Info popover */}
+                <div style={{ position: "relative" }}>
+                    <button
+                        onMouseEnter={() => setShowInfo(true)}
+                        onMouseLeave={() => setShowInfo(false)}
+                        onClick={() => setShowInfo(s => !s)}
+                        style={{
+                            width: 18, height: 18, borderRadius: "50%", fontSize: 11,
+                            fontWeight: 700, lineHeight: "18px", textAlign: "center",
+                            cursor: "pointer", border: "1px solid var(--color-border-secondary)",
+                            background: "var(--color-background-secondary)",
+                            color: "var(--color-text-tertiary)", padding: 0, flexShrink: 0,
+                        }}
+                    >?</button>
+                    {showInfo && (
+                        <div style={{
+                            position: "absolute", right: 0, top: "calc(100% + 6px)", zIndex: 50,
+                            width: 260, background: "var(--color-background-primary)",
+                            border: "1px solid var(--color-border-secondary)",
+                            borderRadius: "var(--border-radius-md)",
+                            padding: "12px 14px", boxShadow: "0 4px 16px rgba(0,0,0,0.12)",
+                            fontSize: 12, lineHeight: 1.65, color: "var(--color-text-secondary)",
+                        }}>
+                            <div style={{ marginBottom: 8 }}>
+                                <strong style={{ color: "var(--color-text-primary)" }}>Normal</strong>
+                                {" "}— BT/HT ≤14, FC ≤13, BM ≤15. Fast; runs automatically on page load. Results cached in localStorage.
+                            </div>
+                            <div>
+                                <strong style={{ color: "var(--color-text-primary)" }}>Extended</strong>
+                                {" "}— BT/HT ≤16, FC ≤18, BM ≤20. Slow; BT/HT at N=15–16 may take several minutes. Requires confirmation. Results cached per-N so computation resumes if interrupted.
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            {/* Confirmation dialog */}
+            {showConfirm && (
+                <div style={{
+                    position: "fixed", inset: 0, zIndex: 200,
+                    background: "rgba(0,0,0,0.45)",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                }}>
+                    <div style={{
+                        background: "var(--color-background-primary)",
+                        border: "1.5px solid var(--color-border-secondary)",
+                        borderRadius: "var(--border-radius-lg)",
+                        padding: "28px 32px", maxWidth: 420, width: "90%",
+                        display: "flex", flexDirection: "column", gap: 16,
+                        boxShadow: "0 8px 32px rgba(0,0,0,0.18)",
+                    }}>
+                        <div style={{ fontSize: 16, fontWeight: 700, color: "var(--color-text-primary)" }}>
+                            Start extended computation?
+                        </div>
+                        <p style={{ margin: 0, fontSize: 13, lineHeight: 1.6,
+                            color: "var(--color-text-secondary)" }}>
+                            Extended mode benchmarks higher N values that can take a long time:
+                        </p>
+                        <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12, lineHeight: 1.8,
+                            color: "var(--color-text-secondary)" }}>
+                            <li><strong>BM</strong> (N ≤ 17) — fast, completes in seconds</li>
+                            <li><strong>FC</strong> (N ≤ 18) — moderate, ~1–2 minutes total</li>
+                            <li><strong>BT / HT</strong> (N ≤ 16) — slow; N=15–16 may each take
+                                several minutes</li>
+                        </ul>
+                        <div style={{
+                            padding: "10px 14px", borderRadius: "var(--border-radius-md)",
+                            background: "var(--color-background-warning)",
+                            border: "0.5px solid var(--color-border-warning)",
+                            fontSize: 12, color: "var(--color-text-warning)", lineHeight: 1.6,
+                        }}>
+                            ⚠️ This runs on your device using background workers and may cause
+                            your PC to heat up noticeably. The UI stays responsive, but your
+                            computer's resources will be used during computation.
+                            Results are cached in localStorage — each N is only computed once.
+                        </div>
+                        <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+                            <button
+                                onClick={() => setShowConfirm(false)}
+                                style={{
+                                    padding: "7px 18px", borderRadius: 99, fontSize: 13,
+                                    cursor: "pointer", fontWeight: 500,
+                                    border: "1px solid var(--color-border-secondary)",
+                                    background: "var(--color-background-secondary)",
+                                    color: "var(--color-text-secondary)",
+                                }}
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={confirmExtended}
+                                style={{
+                                    padding: "7px 18px", borderRadius: 99, fontSize: 13,
+                                    cursor: "pointer", fontWeight: 600,
+                                    border: "none",
+                                    background: "var(--accent)",
+                                    color: "#fff",
+                                }}
+                            >
+                                Start computation
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Refresh confirmation dialog */}
+            {showRefreshConfirm && (
+                <div style={{
+                    position: "fixed", inset: 0, zIndex: 200,
+                    background: "rgba(0,0,0,0.45)",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                }}>
+                    <div style={{
+                        background: "var(--color-background-primary)",
+                        border: "1.5px solid var(--color-border-secondary)",
+                        borderRadius: "var(--border-radius-lg)",
+                        padding: "28px 32px", maxWidth: 380, width: "90%",
+                        display: "flex", flexDirection: "column", gap: 14,
+                        boxShadow: "0 8px 32px rgba(0,0,0,0.18)",
+                    }}>
+                        <div style={{ fontSize: 16, fontWeight: 700, color: "var(--color-text-primary)" }}>
+                            Refresh {extended ? "extended" : "normal"} mode?
+                        </div>
+                        <p style={{ margin: 0, fontSize: 13, lineHeight: 1.6, color: "var(--color-text-secondary)" }}>
+                            This will clear all cached results for{" "}
+                            <strong>{extended ? "extended" : "normal"} mode</strong>{" "}
+                            ({extended ? "BT/HT ≤16, FC ≤18, BM ≤20" : "BT/HT ≤14, FC ≤13, BM ≤15"}) from
+                            localStorage and recompute everything from scratch.
+                        </p>
+                        {extended && (
+                            <div style={{
+                                padding: "8px 12px", borderRadius: "var(--border-radius-md)",
+                                background: "var(--color-background-warning)",
+                                border: "0.5px solid var(--color-border-warning)",
+                                fontSize: 12, color: "var(--color-text-warning)",
+                            }}>
+                                ⚠️ Extended recomputation may take several minutes for BT/HT.
+                            </div>
+                        )}
+                        <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+                            <button
+                                onClick={() => setShowRefreshConfirm(false)}
+                                style={{
+                                    padding: "7px 18px", borderRadius: 99, fontSize: 13,
+                                    cursor: "pointer", fontWeight: 500,
+                                    border: "1px solid var(--color-border-secondary)",
+                                    background: "var(--color-background-secondary)",
+                                    color: "var(--color-text-secondary)",
+                                }}
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={() => {
+                                    setShowRefreshConfirm(false);
+                                    if (extended) {
+                                        clearExtCache();
+                                        (["bt", "ht", "fc", "bm"] as MethodKey[]).forEach(m =>
+                                            startExtendedIfNeeded(m, NS_FOR_METHOD_EXTENDED[m]));
+                                    } else {
+                                        clearNormalCache();
+                                        (["bt", "ht", "fc", "bm"] as MethodKey[]).forEach(m =>
+                                            startIfNeeded(m, NS_FOR_METHOD[m]));
+                                    }
+                                }}
+                                style={{
+                                    padding: "7px 18px", borderRadius: 99, fontSize: 13,
+                                    cursor: "pointer", fontWeight: 600,
+                                    border: "none", background: "var(--accent)", color: "#fff",
+                                }}
+                            >
+                                ↺ Refresh
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {methods.map(m => {
                 const meta       = METHOD_META[m];
                 const desc       = DESCRIPTIONS[m];
                 const isExpanded = expanded === m;
-                const isCached   = !!results[m];
+                const isCached   = extended ? !!resultsExtended[m] : !!(results[m] ?? resultsExtended[m]);
+                const isLoading  = extended ? !!progressExtMap[m] : (!resultsExtended[m] && !!progressMap[m]);
 
                 return (
                     <div key={m} style={{
@@ -391,7 +679,7 @@ export function AboutView() {
                                         }}>
                                             chart ready
                                         </span>
-                                    ) : progressMap[m] && (
+                                    ) : isLoading && (
                                         <span style={{
                                             fontSize: 9, padding: "1px 6px", borderRadius: 99,
                                             background: "var(--color-background-secondary)",
@@ -446,7 +734,7 @@ export function AboutView() {
                                     border: "0.5px solid var(--color-border-tertiary)",
                                     borderRadius: "var(--border-radius-md)",
                                 }}>
-                                    <ComplexityChart method={m} />
+                                    <ComplexityChart method={m} extended={extended} />
                                 </div>
                             </>
                         )}
