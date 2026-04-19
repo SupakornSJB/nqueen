@@ -93,4 +93,6 @@ The live site is available at `https://<your-username>.github.io/nqueen/`. If th
 - [Vite](https://vite.dev)
 - [Zustand](https://zustand-demo.pmnd.rs) — global state for complexity chart cache
 
-Built with [Claude](https://claude.ai) by Anthropic.
+## AI Disclosure
+
+This project is built mostly with [Claude](https://claude.ai) Code (Sonnet 4.6) by Anthropic.
