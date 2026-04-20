@@ -80,11 +80,13 @@ src/
 
 ## Deployment
 
+**Note: This live site is already available at https://supakornsjb.github.io/nqueen/, This section is only if you want to deploy your own version from your own fork.**
+
 Deploys automatically to GitHub Pages on every push to `main` via GitHub Actions (`.github/workflows/deploy.yml`).
 
 **One-time setup:** Repository → Settings → Pages → Source: **GitHub Actions**
 
-The live site is available at `https://<your-username>.github.io/nqueen/`. If the repository name differs, update the `base` field in `vite.config.ts`.
+If you choose to deploy your version using the available GitHub Workflow, the live site will be available at `https://<your-username>.github.io/nqueen/`. If the repository name differs, update the `base` field in `vite.config.ts`.
 
 ## Built With
 
